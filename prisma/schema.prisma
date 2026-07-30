@@ -1,0 +1,261 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// SQLite has no native enums; string fields below are constrained by the
+// TypeScript union types in lib/types.ts and validated in server actions.
+
+model User {
+  id     String  @id @default(cuid())
+  name   String
+  email  String  @unique
+  active Boolean @default(true)
+
+  roles         UserRole[]
+  ledDeals      Deal[]               @relation("DealLead")
+  memberships   DealTeamMember[]
+  followUpsAssigned FollowUp[]       @relation("FollowUpAssignee")
+  followUpsCreated  FollowUp[]       @relation("FollowUpCreator")
+  documents     Document[]
+  checklistDone ChecklistItem[]
+  approvals     Approval[]
+  events        StageEvent[]
+  oddCompleted  Deal[]               @relation("OddCompletedBy")
+  documentReviews DocumentReview[]
+  dealProfiles  DealProfile[]
+  session       Session?
+
+  createdAt DateTime @default(now())
+}
+
+// One row = one signed-in browser. userId is unique: a single seat per user,
+// pre-auth. A session goes stale after 30 min idle (see lib/session.ts).
+model Session {
+  token      String   @id // random 32-byte hex, held in the cookie
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String   @unique
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+}
+
+model UserRole {
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  role   String // DEAL_TEAM | OPS | LEGAL | MD_PUBLIC | MD_PRIVATE | CFO | CEO | ADMIN
+
+  @@unique([userId, role])
+}
+
+model AssetClass {
+  id         String @id @default(cuid())
+  name       String @unique
+  marketType String @default("PUBLIC") // PUBLIC | PRIVATE — routes the MD approval
+  deals      Deal[]
+}
+
+model Deal {
+  id           String     @id @default(cuid())
+  managerName  String
+  fundName     String
+  strategy     String?
+  targetSizeMm Float? // target allocation in $ millions
+  assetClass   AssetClass @relation(fields: [assetClassId], references: [id])
+  assetClassId String
+  lead         User       @relation("DealLead", fields: [leadId], references: [id])
+  leadId       String
+  source       String?
+  notes        String?
+
+  stage          String   @default("PIPELINE") // PIPELINE | ONE_PAGER | FIVE_PAGER | ODD_LEGAL | PROPOSAL | APPROVALS | APPROVED
+  status         String   @default("ACTIVE") // ACTIVE | ON_HOLD | PENCILS_DOWN | APPROVED | FUNDED
+  // set when the deal goes pencils down: closed out non-funded, at any stage
+  pencilsDownReason String?
+  // set when Ops marks the approved allocation wired; FUNDED deals are hidden by default
+  fundedAt       DateTime?
+  stageEnteredAt DateTime @default(now())
+
+  // upcoming IC meeting (Monday) this deal is slated to present at
+  scheduledFor DateTime?
+
+  // set by Ops once the ODD checklist is complete; gates exit from ODD_LEGAL
+  oddCompletedAt   DateTime?
+  oddCompletedBy   User?     @relation("OddCompletedBy", fields: [oddCompletedById], references: [id])
+  oddCompletedById String?
+
+  team           DealTeamMember[]
+  followUps      FollowUp[]
+  documents      Document[]
+  checklistItems ChecklistItem[]
+  approvals      Approval[]
+  events         StageEvent[]
+  presentations  PresentationRecord[]
+  documentReviews DocumentReview[]
+  profile        DealProfile?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model DealTeamMember {
+  id     String @id @default(cuid())
+  deal   Deal   @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  dealId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  @@unique([dealId, userId])
+}
+
+model FollowUp {
+  id          String    @id @default(cuid())
+  deal        Deal      @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  dealId      String
+  stage       String // stage the follow-up belongs to
+  track       String    @default("DEAL") // DEAL | ODD | LEGAL
+  title       String
+  assignee    User?     @relation("FollowUpAssignee", fields: [assigneeId], references: [id])
+  assigneeId  String?
+  status      String    @default("OPEN") // OPEN | RESOLVED | WAIVED
+  waiveNote   String?
+  createdBy   User      @relation("FollowUpCreator", fields: [createdById], references: [id])
+  createdById String
+  resolvedAt  DateTime?
+  createdAt   DateTime  @default(now())
+}
+
+model Document {
+  id           String   @id @default(cuid())
+  deal         Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  dealId       String
+  kind         String // ONE_PAGER | FIVE_PAGER | DDQ | ODD_REPORT | LPA | SUB_DOCS | PROPOSAL | OTHER
+  type         String // FILE | LINK
+  name         String
+  path         String? // server path for FILE
+  url          String? // external url for LINK
+  previewPath  String? // PDF preview converted from Office formats at upload
+  version      Int
+  note         String?
+  uploadedBy   User     @relation(fields: [uploadedById], references: [id])
+  uploadedById String
+  createdAt    DateTime @default(now())
+  reviews      DocumentReview[]
+  profiles     DealProfile[]
+
+  @@unique([dealId, kind, version])
+}
+
+model ChecklistItem {
+  id        String    @id @default(cuid())
+  deal      Deal      @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  dealId    String
+  track     String // ODD | LEGAL
+  label     String
+  done      Boolean   @default(false)
+  doneBy    User?     @relation(fields: [doneById], references: [id])
+  doneById  String?
+  doneAt    DateTime?
+  sortOrder Int       @default(0)
+}
+
+model ChecklistTemplate {
+  id        String @id @default(cuid())
+  track     String // ODD | LEGAL
+  label     String
+  sortOrder Int    @default(0)
+}
+
+model Approval {
+  id          String    @id @default(cuid())
+  deal        Deal      @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  dealId      String
+  step        String // MD | LEGAL | CFO | CEO
+  status      String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  decidedBy   User?     @relation(fields: [decidedById], references: [id])
+  decidedById String?
+  decidedAt   DateTime?
+  note        String?
+
+  @@unique([dealId, step])
+}
+
+model StageEvent {
+  id        String   @id @default(cuid())
+  deal      Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  dealId    String
+  actor     User?    @relation(fields: [actorId], references: [id])
+  actorId   String?
+  action    String
+  detail    String?
+  createdAt DateTime @default(now())
+}
+
+// AI-extracted manager profile built from a pitch deck: key people, terms,
+// deadlines, and track record (returns series or prior-fund history).
+model DealProfile {
+  id               String    @id @default(cuid())
+  deal             Deal      @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  dealId           String    @unique
+  sourceDocument   Document? @relation(fields: [sourceDocumentId], references: [id], onDelete: SetNull)
+  sourceDocumentId String?
+  managerType      String // HEDGE_FUND | PRIVATE_MARKETS | OTHER
+  data             String // JSON: firm, keyPeople, keyTerms, deadlines, trackRecord, notes
+  model            String
+  createdBy        User      @relation(fields: [createdById], references: [id])
+  createdById      String
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
+
+// Reference datasets for charts (e.g. PE fund TVPI quintiles by vintage).
+model Benchmark {
+  id   String @id @default(cuid())
+  name String @unique
+  kind String // PE_QUINTILES
+  data String // JSON
+}
+
+// Admin-editable review standards and rubrics: the prompt an AI analysis runs
+// against, per document kind and mode (STANDARDS reviews an LPA/DDQ against
+// firm standards; DEVILS_ADVOCATE rebuts a one-/five-pager or proposal).
+model ReviewStandard {
+  id     String @id @default(cuid())
+  kind   String // document kind this standard applies to
+  mode   String @default("STANDARDS") // STANDARDS | DEVILS_ADVOCATE
+  title  String
+  prompt String
+
+  @@unique([kind, mode])
+}
+
+model DocumentReview {
+  id          String   @id @default(cuid())
+  document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  documentId  String
+  deal        Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  dealId      String
+  mode        String   @default("STANDARDS") // STANDARDS | DEVILS_ADVOCATE
+  model       String
+  status      String   @default("COMPLETE") // COMPLETE | FAILED
+  assessment  String? // STANDARD | NEGOTIABLE_ISSUES | SIGNIFICANT_CONCERNS
+  summary     String?
+  findings    String? // JSON array of findings
+  error       String?
+  requestedBy User     @relation(fields: [requestedById], references: [id])
+  requestedById String
+  createdAt   DateTime @default(now())
+}
+
+model PresentationRecord {
+  id          String   @id @default(cuid())
+  deal        Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  dealId      String
+  stage       String
+  presentedAt DateTime
+  notes       String?
+}

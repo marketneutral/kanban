@@ -1,0 +1,29 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  /* Accent: Columbia blue ramp — accent-200 is Columbia Blue (Pantone 290,
+     #B9D9EB); deeper steps carry actions and text on light surfaces */
+  --color-accent-50: #f2f8fc;
+  --color-accent-100: #e1eef7;
+  --color-accent-200: #b9d9eb;
+  --color-accent-300: #8cbfde;
+  --color-accent-400: #5b9fc9;
+  --color-accent-500: #3d84b4;
+  --color-accent-600: #2f6fa8;
+  --color-accent-700: #235a92;
+  --color-accent-800: #1d4a78;
+  --color-accent-900: #1a3d62;
+  --color-accent-950: #10263f;
+}
+
+body {
+  background: var(--color-stone-100);
+  color: var(--color-stone-800);
+}
+
+::selection {
+  background: var(--color-accent-200);
+}

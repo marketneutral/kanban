@@ -1,0 +1,19 @@
+services:
+  allocator:
+    build: .
+    ports:
+      - "${PORT:-8642}:8642"
+    environment:
+      # set SEED=1 on first run to load the demo roster and sample deals
+      SEED: "${SEED:-0}"
+      # enables ✨ AI document reviews via Azure OpenAI (optional)
+      AZURE_OPENAI_ENDPOINT: "${AZURE_OPENAI_ENDPOINT:-}"
+      AZURE_OPENAI_API_KEY: "${AZURE_OPENAI_API_KEY:-}"
+      AZURE_OPENAI_DEPLOYMENT: "${AZURE_OPENAI_DEPLOYMENT:-}"
+      AZURE_OPENAI_API_VERSION: "${AZURE_OPENAI_API_VERSION:-2024-10-21}"
+    volumes:
+      - allocator-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  allocator-data:
