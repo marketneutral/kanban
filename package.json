@@ -12,6 +12,9 @@
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
+    "d3-force": "^3.0.0",
+    "d3-selection": "^3.0.0",
+    "d3-zoom": "^3.0.0",
     "geist": "^1.7.2",
     "mammoth": "^1.12.0",
     "next": "16.2.12",
@@ -22,6 +25,9 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/d3-force": "^3.0.10",
+    "@types/d3-selection": "^3.0.11",
+    "@types/d3-zoom": "^3.0.8",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

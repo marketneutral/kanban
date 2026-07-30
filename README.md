@@ -86,6 +86,18 @@ Without these the feature simply stays hidden. Reviews are audited like every ot
 action. Scanned (image-only) documents aren't supported yet — extraction requires a
 text layer.
 
+## 🗺 Pipeline Map
+
+The board has a **Board | Map** toggle. The map renders every deal as a bubble —
+area = target $, color = asset class (CVD-validated palette), ring = gate status — packed
+by a force simulation into clusters you can switch live: **asset class** (default),
+**stage lanes**, or **deal lead**; each cluster is captioned with its count and total $.
+Pan and zoom freely (semantic zoom reveals names, then sizes and stages); hovering a
+deal shows a tooltip and illuminates links to every deal sharing its lead or team
+members; clicking opens the deal. Built for hundreds of deals — bubble sizes auto-scale
+to keep clusters legible, and the kanban itself caps columns at 25 cards with a
+"Show more" expander. Same filters drive both views.
+
 ## 😈 Devil's Advocate
 
 On any uploaded one-pager, five-pager, or investment proposal, run a **Devil's Advocate**
@@ -124,6 +136,7 @@ and a one-pager — so every AI feature is demoable immediately.
 | `npm run build` / `npm start` | Production build / serve |
 | `npm run db:push` | Sync Prisma schema to SQLite |
 | `npm run db:seed` | Seed roster, asset classes, checklist templates, sample deals |
+| `npx tsx prisma/stress.ts 200` | Insert 200 synthetic deals to scale-test the board/map (`--clean` removes them) |
 
 ## Status
 
