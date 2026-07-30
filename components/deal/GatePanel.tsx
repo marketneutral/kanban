@@ -1,5 +1,7 @@
+import Link from "next/link";
 import type { GateStatus } from "@/lib/workflow";
 import { STAGE_LABELS, type Stage } from "@/lib/types";
+import { fmtMeeting } from "@/lib/meetings";
 import { moveStage, setDealStatus } from "@/app/actions/deals";
 import { recordPresentation } from "@/app/actions/workflow";
 
@@ -13,6 +15,7 @@ export default function GatePanel({
   manager,
   prevStage,
   needsPresentation,
+  scheduledFor,
 }: {
   dealId: string;
   stage: Stage;
@@ -21,6 +24,7 @@ export default function GatePanel({
   manager: boolean;
   prevStage: Stage | null;
   needsPresentation: boolean;
+  scheduledFor: Date | null;
 }) {
   const active = status === "ACTIVE";
   const inChain = stage === "APPROVALS";
@@ -66,10 +70,28 @@ export default function GatePanel({
         </ul>
       )}
 
+      {active && needsPresentation && PRESENTED_STAGES.includes(stage) && (
+        <p className="mt-3 rounded-md bg-stone-50 px-3 py-2 text-[12px] text-stone-500">
+          {scheduledFor ? (
+            <>
+              📅 On the IC agenda for{" "}
+              <span className="font-medium text-stone-700">{fmtMeeting(scheduledFor)}</span>
+            </>
+          ) : (
+            <>
+              Not yet on an IC agenda —{" "}
+              <Link href="/meetings" className="font-medium text-accent-700 hover:underline">
+                schedule it
+              </Link>
+            </>
+          )}
+        </p>
+      )}
+
       {manager && active && needsPresentation && PRESENTED_STAGES.includes(stage) && (
         <form
           action={recordPresentation}
-          className="mt-4 flex flex-col gap-2 rounded-lg bg-stone-50 p-3"
+          className="mt-3 flex flex-col gap-2 rounded-lg bg-stone-50 p-3"
         >
           <input type="hidden" name="dealId" value={dealId} />
           <label className="text-[12px] font-medium text-stone-600">

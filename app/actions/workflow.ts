@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireUserAction } from "@/lib/session";
-import { canManageDeals, hasRole, isAdmin, STAGES } from "@/lib/types";
+import { canManageDeals, hasRole, isAdmin } from "@/lib/types";
+import { isMonday, todayUtc } from "@/lib/meetings";
 
 function touch(dealId: string) {
   revalidatePath("/board");
@@ -115,6 +116,8 @@ export async function recordPresentation(formData: FormData) {
   await db.presentationRecord.create({
     data: { dealId, stage: deal.stage, presentedAt, notes },
   });
+  // presenting clears the deal from the upcoming IC agenda
+  await db.deal.update({ where: { id: dealId }, data: { scheduledFor: null } });
   await db.stageEvent.create({
     data: {
       dealId,
@@ -123,6 +126,51 @@ export async function recordPresentation(formData: FormData) {
       detail: JSON.stringify({ stage: deal.stage, presentedAt: presentedAt.toISOString() }),
     },
   });
+  touch(dealId);
+}
+
+// ------------------------------------------------------------- IC meetings
+
+export async function scheduleForIC(formData: FormData) {
+  const user = await requireUserAction();
+  if (!canManageDeals(user)) throw new Error("Not permitted");
+  const dealId = String(formData.get("dealId") ?? "");
+  const dateRaw = String(formData.get("meetingDate") ?? "");
+  const date = new Date(`${dateRaw}T00:00:00Z`);
+  if (Number.isNaN(date.getTime()) || !isMonday(date)) {
+    throw new Error("IC meetings are on Mondays");
+  }
+  if (date < todayUtc()) throw new Error("That Monday has passed");
+
+  await db.deal.update({
+    where: { id: dealId },
+    data: {
+      scheduledFor: date,
+      events: {
+        create: {
+          actorId: user.id,
+          action: "IC_SCHEDULED",
+          detail: JSON.stringify({ date: dateRaw }),
+        },
+      },
+    },
+  });
+  revalidatePath("/meetings");
+  touch(dealId);
+}
+
+export async function unscheduleFromIC(formData: FormData) {
+  const user = await requireUserAction();
+  if (!canManageDeals(user)) throw new Error("Not permitted");
+  const dealId = String(formData.get("dealId") ?? "");
+  await db.deal.update({
+    where: { id: dealId },
+    data: {
+      scheduledFor: null,
+      events: { create: { actorId: user.id, action: "IC_UNSCHEDULED" } },
+    },
+  });
+  revalidatePath("/meetings");
   touch(dealId);
 }
 

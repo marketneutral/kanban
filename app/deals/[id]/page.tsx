@@ -38,6 +38,8 @@ const EVENT_LABELS: Record<string, string> = {
   PRESENTED: "recorded a team presentation",
   DOCUMENT_ADDED: "attached a document",
   ODD_COMPLETED: "signed off operational due diligence",
+  IC_SCHEDULED: "put the deal on an IC agenda",
+  IC_UNSCHEDULED: "removed the deal from the IC agenda",
   APPROVAL_GRANTED: "signed an approval",
   APPROVAL_REJECTED: "rejected the deal at approval",
   DEAL_APPROVED: "gave final approval — deal approved",
@@ -244,6 +246,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
             manager={manager}
             prevStage={idx > 0 ? (STAGES[idx - 1] as Stage) : null}
             needsPresentation={needsPresentation}
+            scheduledFor={deal.scheduledFor}
           />
 
           <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">

@@ -28,7 +28,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   if (doc.type === "LINK" && doc.url) redirect(doc.url);
   if (!doc.path) notFound();
 
-  const abs = path.normalize(path.join(UPLOAD_ROOT, doc.path));
+  const search = new URL(req.url).searchParams;
+  const wantPreview = search.has("preview") && !!doc.previewPath;
+  const relPath = wantPreview ? doc.previewPath! : doc.path;
+
+  const abs = path.normalize(path.join(UPLOAD_ROOT, relPath));
   if (!abs.startsWith(UPLOAD_ROOT)) notFound();
 
   let size: number;
@@ -38,8 +42,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     notFound();
   }
 
-  const forceDownload = new URL(req.url).searchParams.has("dl");
-  const inlineType = INLINE_TYPES[path.extname(doc.name).toLowerCase()];
+  const forceDownload = search.has("dl");
+  const inlineType = wantPreview
+    ? "application/pdf"
+    : INLINE_TYPES[path.extname(doc.name).toLowerCase()];
   const disposition = !forceDownload && inlineType ? "inline" : "attachment";
   const contentType = inlineType ?? "application/octet-stream";
 

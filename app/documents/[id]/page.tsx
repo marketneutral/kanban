@@ -87,7 +87,21 @@ export default async function DocumentViewerPage({
       </header>
 
       <div className="min-h-0 flex-1 bg-stone-200">
-        {PDF.has(ext) ? (
+        {doc.previewPath && !PDF.has(ext) ? (
+          <div className="flex h-full flex-col">
+            <p className="border-b border-amber-100 bg-amber-50 px-5 py-1.5 text-center text-[12px] text-amber-800">
+              Converted PDF preview — formatting may differ.{" "}
+              <a href={`${src}?dl=1`} className="font-medium underline">
+                Download the original {ext} file
+              </a>
+            </p>
+            <iframe
+              src={`${src}?preview=1`}
+              title={doc.name}
+              className="min-h-0 w-full flex-1 border-0"
+            />
+          </div>
+        ) : PDF.has(ext) ? (
           <iframe src={src} title={doc.name} className="h-full w-full border-0" />
         ) : IMAGE.has(ext) ? (
           <div className="grid h-full place-items-center overflow-auto p-6">

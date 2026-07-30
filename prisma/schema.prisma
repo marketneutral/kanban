@@ -63,6 +63,9 @@ model Deal {
   passedReason   String?
   stageEnteredAt DateTime @default(now())
 
+  // upcoming IC meeting (Monday) this deal is slated to present at
+  scheduledFor DateTime?
+
   // set by Ops once the ODD checklist is complete; gates exit from ODD_LEGAL
   oddCompletedAt   DateTime?
   oddCompletedBy   User?     @relation("OddCompletedBy", fields: [oddCompletedById], references: [id])
@@ -116,6 +119,7 @@ model Document {
   name         String
   path         String? // server path for FILE
   url          String? // external url for LINK
+  previewPath  String? // PDF preview converted from Office formats at upload
   version      Int
   note         String?
   uploadedBy   User     @relation(fields: [uploadedById], references: [id])

@@ -16,6 +16,10 @@ RUN npx prisma generate && npm run build
 
 
 FROM node:22-alpine
+# LibreOffice powers the in-app PDF previews of Word/Excel/PowerPoint uploads.
+# Remove these two lines for a much smaller image if previews aren't needed.
+RUN apk add --no-cache libreoffice-writer libreoffice-calc libreoffice-impress \
+    ttf-dejavu font-noto
 WORKDIR /app
 ENV NODE_ENV=production \
     DATABASE_URL="file:../data/app.db" \

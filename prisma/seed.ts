@@ -163,6 +163,11 @@ async function main() {
       const leadId = userIds[d.lead]!;
       const stageIdx = STAGE_ORDER.indexOf(d.stage);
 
+      // Blackwood demos the IC agenda: slated for the next Monday meeting
+      const nextMonday = new Date();
+      nextMonday.setUTCHours(0, 0, 0, 0);
+      nextMonday.setUTCDate(nextMonday.getUTCDate() + ((8 - nextMonday.getUTCDay()) % 7));
+
       const deal = await db.deal.create({
         data: {
           managerName: d.managerName,
@@ -174,6 +179,7 @@ async function main() {
           source: d.source,
           stage: d.stage,
           stageEnteredAt: enteredAt,
+          scheduledFor: d.managerName === "Blackwood Capital" ? nextMonday : null,
           team: { create: d.team.map((name) => ({ userId: userIds[name]! })) },
           events: {
             create: {

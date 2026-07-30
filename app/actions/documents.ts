@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { requireUserAction } from "@/lib/session";
 import { canManageDeals, hasRole, isAdmin, DOC_KINDS, type DocKind } from "@/lib/types";
 import { UPLOAD_ROOT } from "@/lib/uploads";
+import { generatePdfPreview } from "@/lib/convert";
 
 const OPS_KINDS: DocKind[] = ["DDQ", "ODD_REPORT"];
 const LEGAL_KINDS: DocKind[] = ["LPA", "SUB_DOCS"];
@@ -50,7 +51,8 @@ export async function addDocument(formData: FormData) {
     const absPath = path.join(UPLOAD_ROOT, relPath);
     await mkdir(path.dirname(absPath), { recursive: true });
     await writeFile(absPath, Buffer.from(await f.arrayBuffer()));
-    data = { type: "FILE", name: f.name, path: relPath, url: null };
+    const previewPath = await generatePdfPreview(relPath);
+    data = { type: "FILE", name: f.name, path: relPath, url: null, previewPath };
   } else {
     if (!/^https?:\/\//i.test(url)) throw new Error("Link must start with http(s)://");
     const name = String(formData.get("name") ?? "").trim() || url;

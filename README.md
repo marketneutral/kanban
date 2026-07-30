@@ -86,3 +86,9 @@ database.
   deal to Investment Proposal, voids all signatures, and files the note as a follow-up
 - **M5 (done)** — reports: pipeline matrix (stage × asset class, counts and $mm),
   per-role approval queue with a personal "waiting on you" list, workload by person
+- **Post-v1 (done)** — in-app document viewer (native PDF + image rendering, versioned,
+  with Office docs auto-converted to PDF previews via LibreOffice at upload); IC
+  meetings page: Monday agendas, deal scheduling, materials-readiness badges
+
+> Office-doc previews need LibreOffice on the host (`soffice` on PATH). The Docker image
+> includes it; without it, uploads still work and the viewer offers downloads instead.
