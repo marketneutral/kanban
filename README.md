@@ -44,5 +44,8 @@ Admin role for managing users, roles and asset classes at `/admin`.
   gates on stage advancement; follow-ups with resolve / lead-only waive; presentation
   records; versioned documents (upload + link) with role-scoped kinds; ODD & Legal
   parallel checklist tracks with Ops sign-off; gate readiness dots on the board
-- **M4** — approval chain: MD + Legal in parallel, then COO, then CEO; rejection flow
-- **M5** — reports (pipeline by stage × asset class, approval queue, workload), polish
+- **M4 (done)** — approval chain: MD + Legal in parallel (Legal gated on the legal doc
+  track), then COO, then CEO; CEO signature finalizes the deal; rejection returns the
+  deal to Investment Proposal, voids all signatures, and files the note as a follow-up
+- **M5 (done)** — reports: pipeline matrix (stage × asset class, counts and $mm),
+  per-role approval queue with a personal "waiting on you" list, workload by person

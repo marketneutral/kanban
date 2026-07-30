@@ -13,6 +13,8 @@ export type DealCardData = {
   openFollowUps: number;
   /** true = gate met, false = items open, null = not applicable */
   gateReady: boolean | null;
+  /** signatures collected so far, only for deals in Approvals */
+  approvedCount: number | null;
 };
 
 export default function DealCard({ deal }: { deal: DealCardData }) {
@@ -53,6 +55,11 @@ export default function DealCard({ deal }: { deal: DealCardData }) {
         <span className="rounded bg-accent-50 px-1.5 py-0.5 font-mono text-[11px] font-medium text-accent-800">
           {fmtMm(deal.targetSizeMm)}
         </span>
+        {deal.approvedCount !== null && (
+          <span className="rounded bg-accent-100 px-1.5 py-0.5 text-[11px] font-medium text-accent-800">
+            ✓ {deal.approvedCount}/4 signed
+          </span>
+        )}
         {onHold && (
           <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-700">
             On hold

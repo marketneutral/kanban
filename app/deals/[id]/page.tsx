@@ -13,7 +13,8 @@ import {
   type Stage,
   type DealStatus,
 } from "@/lib/types";
-import { evaluateGate, evaluateLegal } from "@/lib/workflow";
+import { evaluateGate, evaluateLegal, evaluateChain } from "@/lib/workflow";
+import ApprovalChain from "@/components/deal/ApprovalChain";
 import { fmtMm, fmtDate, daysSince, initials } from "@/lib/format";
 import GatePanel from "@/components/deal/GatePanel";
 import Documents from "@/components/deal/Documents";
@@ -37,6 +38,9 @@ const EVENT_LABELS: Record<string, string> = {
   PRESENTED: "recorded a team presentation",
   DOCUMENT_ADDED: "attached a document",
   ODD_COMPLETED: "signed off operational due diligence",
+  APPROVAL_GRANTED: "signed an approval",
+  APPROVAL_REJECTED: "rejected the deal at approval",
+  DEAL_APPROVED: "gave final approval — deal approved",
 };
 
 export default async function DealPage({ params }: { params: Promise<{ id: string }> }) {
@@ -57,6 +61,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
       },
       checklistItems: { include: { doneBy: true } },
       presentations: true,
+      approvals: { include: { decidedBy: true } },
       events: { include: { actor: true }, orderBy: { createdAt: "desc" }, take: 30 },
     },
   });
@@ -77,6 +82,8 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
   const legal = evaluateLegal(deal);
   const needsPresentation = !deal.presentations.some((p) => p.stage === deal.stage);
   const showTracks = idx >= stageIndex("ODD_LEGAL") || deal.checklistItems.length > 0;
+  const showChain = deal.stage === "APPROVALS" || deal.stage === "APPROVED";
+  const chain = showChain ? evaluateChain(deal, deal.approvals) : null;
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-6">
@@ -221,6 +228,14 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
 
         {/* Right column */}
         <div className="space-y-5">
+          {chain && (
+            <ApprovalChain
+              dealId={deal.id}
+              chain={chain}
+              userRoles={user.roles.map((r) => r.role)}
+              finalized={deal.stage === "APPROVED"}
+            />
+          )}
           <GatePanel
             dealId={deal.id}
             stage={deal.stage as Stage}

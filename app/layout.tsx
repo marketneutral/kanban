@@ -48,6 +48,7 @@ export default async function RootLayout({
             {user && (
               <nav className="flex items-center gap-1 text-sm">
                 <NavLink href="/board">Board</NavLink>
+                <NavLink href="/reports">Reports</NavLink>
                 {isAdmin(user) && <NavLink href="/admin">Admin</NavLink>}
               </nav>
             )}

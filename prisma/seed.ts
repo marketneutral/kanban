@@ -127,6 +127,18 @@ async function main() {
         stage: "APPROVALS",
         daysAgo: 9,
       },
+      {
+        managerName: "Sable Peak",
+        fundName: "Sable Peak Multi-Strategy Fund",
+        assetClass: "Multi-Strategy",
+        strategy: "Multi-PM platform",
+        targetSizeMm: 120,
+        lead: "Morgan Chen",
+        team: ["Jordan Lee"],
+        source: "Existing relationship",
+        stage: "APPROVED",
+        daysAgo: 3,
+      },
     ];
 
     const STAGE_ORDER = [
@@ -265,6 +277,33 @@ async function main() {
               },
             ],
           });
+        }
+      }
+
+      // Deals in (or past) the approval chain get their approval rows.
+      if (stageIdx >= STAGE_ORDER.indexOf("APPROVALS")) {
+        const finalized = d.stage === "APPROVED";
+        const signers: Record<string, string> = {
+          MD: userIds["Morgan Chen"]!,
+          LEGAL: userIds["Priya Shah"]!,
+          COO: userIds["Taylor Brooks"]!,
+          CEO: userIds["Casey Whitfield"]!,
+        };
+        for (const step of ["MD", "LEGAL", "COO", "CEO"]) {
+          // Ironbark mid-chain: MD + Legal signed, COO/CEO pending
+          const signed = finalized || step === "MD" || step === "LEGAL";
+          await db.approval.create({
+            data: {
+              dealId: deal.id,
+              step,
+              status: signed ? "APPROVED" : "PENDING",
+              decidedById: signed ? signers[step] : null,
+              decidedAt: signed ? enteredAt : null,
+            },
+          });
+        }
+        if (finalized) {
+          await db.deal.update({ where: { id: deal.id }, data: { status: "APPROVED" } });
         }
       }
 

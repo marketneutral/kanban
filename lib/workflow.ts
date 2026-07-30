@@ -194,6 +194,88 @@ export function evaluateLegal(deal: GateDeal): GateStatus {
   return { nextStage: null, requirements, ready: requirements.every((r) => r.met) };
 }
 
+// ------------------------------------------------------------ approval chain
+
+export type ApprovalRow = {
+  step: string;
+  status: string; // PENDING | APPROVED | REJECTED
+  decidedAt: Date | null;
+  note: string | null;
+  decidedBy?: { name: string } | null;
+};
+
+export type ChainStep = {
+  step: "MD" | "LEGAL" | "COO" | "CEO";
+  row: ApprovalRow | undefined;
+  /** step can be acted on right now */
+  available: boolean;
+  /** why it can't be acted on yet (when pending and not available) */
+  blockedReason: string | null;
+};
+
+/**
+ * MD and Legal sign in parallel (Legal additionally gated on the legal doc
+ * track), then COO, then CEO — the sequential routing decided in PLAN.md.
+ */
+export function evaluateChain(deal: GateDeal, approvals: ApprovalRow[]): ChainStep[] {
+  const get = (s: string) => approvals.find((a) => a.step === s);
+  const md = get("MD");
+  const legal = get("LEGAL");
+  const coo = get("COO");
+  const ceo = get("CEO");
+  const actionable = deal.stage === "APPROVALS" && deal.status === "ACTIVE";
+  const legalDocs = evaluateLegal(deal);
+
+  return [
+    {
+      step: "MD",
+      row: md,
+      available: actionable && md?.status === "PENDING",
+      blockedReason: null,
+    },
+    {
+      step: "LEGAL",
+      row: legal,
+      available: actionable && legal?.status === "PENDING" && legalDocs.ready,
+      blockedReason:
+        legal?.status === "PENDING" && !legalDocs.ready
+          ? `Legal track incomplete — ${unmetSummary(legalDocs)}`
+          : null,
+    },
+    {
+      step: "COO",
+      row: coo,
+      available:
+        actionable &&
+        coo?.status === "PENDING" &&
+        md?.status === "APPROVED" &&
+        legal?.status === "APPROVED",
+      blockedReason:
+        coo?.status === "PENDING" && !(md?.status === "APPROVED" && legal?.status === "APPROVED")
+          ? "Waiting on MD and Legal approvals"
+          : null,
+    },
+    {
+      step: "CEO",
+      row: ceo,
+      available: actionable && ceo?.status === "PENDING" && coo?.status === "APPROVED",
+      blockedReason:
+        ceo?.status === "PENDING" && coo?.status !== "APPROVED" ? "Waiting on COO approval" : null,
+    },
+  ];
+}
+
+/** Create (or reset to pending) the four approval rows when a deal enters Approvals. */
+export async function resetApprovals(dealId: string) {
+  for (const step of ["MD", "LEGAL", "COO", "CEO"]) {
+    await db.approval.upsert({
+      where: { dealId_step: { dealId, step } },
+      update: { status: "PENDING", decidedById: null, decidedAt: null, note: null },
+      create: { dealId, step },
+    });
+  }
+}
+
 export function unmetSummary(gate: GateStatus): string {
   return gate.requirements
     .filter((r) => !r.met)

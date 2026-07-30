@@ -5,7 +5,13 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireUserAction } from "@/lib/session";
 import { canManageDeals, stageIndex, STAGES, STAGE_LABELS, type Stage } from "@/lib/types";
-import { evaluateGate, loadGateDeal, seedChecklists, unmetSummary } from "@/lib/workflow";
+import {
+  evaluateGate,
+  loadGateDeal,
+  resetApprovals,
+  seedChecklists,
+  unmetSummary,
+} from "@/lib/workflow";
 
 async function requireDealManager() {
   const user = await requireUserAction();
@@ -130,6 +136,7 @@ export async function moveStage(formData: FormData) {
   });
 
   if (nextStage === "ODD_LEGAL") await seedChecklists(dealId);
+  if (nextStage === "APPROVALS") await resetApprovals(dealId);
 
   revalidatePath("/board");
   revalidatePath(`/deals/${dealId}`);

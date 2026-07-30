@@ -97,8 +97,8 @@ export default function GatePanel({
         <div className="mt-4 flex flex-col gap-2">
           {inChain ? (
             <p className="rounded-md bg-accent-50 p-3 text-[13px] leading-relaxed text-accent-900">
-              In the approval chain: MD and Legal sign in parallel, then COO, then CEO. Approval
-              actions arrive in M4.
+              Signatures are collected in the approval chain panel above — the deal moves to
+              Approved on the CEO’s signature.
             </p>
           ) : gate.nextStage ? (
             gate.ready ? (

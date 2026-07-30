@@ -28,6 +28,7 @@ export default async function BoardPage({
         assetClass: true,
         lead: true,
         _count: { select: { followUps: { where: { status: "OPEN" } } } },
+        approvals: { select: { status: true } },
         ...gateInclude,
       },
       orderBy: { stageEnteredAt: "asc" },
@@ -88,6 +89,10 @@ export default async function BoardPage({
                     deal={{
                       ...d,
                       openFollowUps: d._count.followUps,
+                      approvedCount:
+                        d.stage === "APPROVALS"
+                          ? d.approvals.filter((a) => a.status === "APPROVED").length
+                          : null,
                       gateReady:
                         d.status === "ACTIVE" && !["APPROVALS", "APPROVED"].includes(d.stage)
                           ? evaluateGate(d).ready
