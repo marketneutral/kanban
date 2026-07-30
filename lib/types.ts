@@ -10,8 +10,10 @@ export const ROLES = [
 ] as const;
 export type Role = (typeof ROLES)[number];
 
+// DEAL_TEAM is the internal role key for investment staff; their *title* is
+// Investor — "deal team" is an assignment to a specific deal, not a job title.
 export const ROLE_LABELS: Record<Role, string> = {
-  DEAL_TEAM: "Deal Team",
+  DEAL_TEAM: "Investor",
   OPS: "Ops",
   LEGAL: "Legal",
   MD_PUBLIC: "MD — Publics",
