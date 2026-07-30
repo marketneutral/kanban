@@ -56,6 +56,20 @@ docker compose down         # stop — the data volume survives
 git pull && docker compose up -d --build   # upgrade — schema migrates on boot, data kept
 ```
 
+Fresh start — wipe everything and reseed the demo data (pre-release, or whenever the
+seed itself has changed):
+
+```bash
+git pull                              # get the latest code
+docker compose down -v                # kill the container AND delete the data volume
+SEED=1 docker compose up -d --build   # rebuild, start fresh, load the demo data
+# → http://localhost:8642  (sign in as Avery Stone for admin)
+```
+
+`-v` deletes the SQLite database and every uploaded document — never use it once the app
+holds real data. Without Docker, the equivalent is
+`rm -rf data && npm run db:push && npm run db:seed`.
+
 Or without compose:
 
 ```bash
