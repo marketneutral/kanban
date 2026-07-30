@@ -129,29 +129,160 @@ async function main() {
       },
     ];
 
+    const STAGE_ORDER = [
+      "PIPELINE",
+      "ONE_PAGER",
+      "FIVE_PAGER",
+      "ODD_LEGAL",
+      "PROPOSAL",
+      "APPROVALS",
+      "APPROVED",
+    ];
+    // documents/presentations required to EXIT each stage — backfilled for
+    // stages a seeded deal has already passed so its history is coherent
+    const STAGE_DOCS: Record<string, string> = {
+      ONE_PAGER: "ONE_PAGER",
+      FIVE_PAGER: "FIVE_PAGER",
+      PROPOSAL: "PROPOSAL",
+    };
+
     for (const d of deals) {
       const enteredAt = new Date(Date.now() - d.daysAgo * 86_400_000);
-      await db.deal.create({
+      const leadId = userIds[d.lead]!;
+      const stageIdx = STAGE_ORDER.indexOf(d.stage);
+
+      const deal = await db.deal.create({
         data: {
           managerName: d.managerName,
           fundName: d.fundName,
           strategy: d.strategy,
           targetSizeMm: d.targetSizeMm,
           assetClassId: assetClasses[d.assetClass]!,
-          leadId: userIds[d.lead]!,
+          leadId,
           source: d.source,
           stage: d.stage,
           stageEnteredAt: enteredAt,
           team: { create: d.team.map((name) => ({ userId: userIds[name]! })) },
           events: {
             create: {
-              actorId: userIds[d.lead]!,
+              actorId: leadId,
               action: "DEAL_CREATED",
               detail: JSON.stringify({ seeded: true }),
             },
           },
         },
       });
+
+      // Backfill artifacts for every stage this deal has already exited.
+      for (let i = 0; i < stageIdx; i++) {
+        const passedStage = STAGE_ORDER[i];
+        const when = new Date(enteredAt.getTime() - (stageIdx - i) * 7 * 86_400_000);
+        const docKind = STAGE_DOCS[passedStage];
+        if (docKind) {
+          await db.document.create({
+            data: {
+              dealId: deal.id,
+              kind: docKind,
+              type: "LINK",
+              name: `${d.managerName} — ${docKind === "ONE_PAGER" ? "One-Pager" : docKind === "FIVE_PAGER" ? "Five-Pager" : "Investment Proposal"}`,
+              url: "https://example.com/docs",
+              version: 1,
+              uploadedById: leadId,
+              createdAt: when,
+            },
+          });
+          await db.presentationRecord.create({
+            data: { dealId: deal.id, stage: passedStage, presentedAt: when },
+          });
+          await db.followUp.create({
+            data: {
+              dealId: deal.id,
+              stage: passedStage,
+              title: `Team feedback on the ${docKind === "ONE_PAGER" ? "one-pager" : docKind === "FIVE_PAGER" ? "five-pager" : "proposal"}`,
+              status: "RESOLVED",
+              createdById: leadId,
+              resolvedAt: when,
+              createdAt: when,
+            },
+          });
+        }
+      }
+
+      // Deals at or past ODD & Legal get their checklists.
+      if (stageIdx >= STAGE_ORDER.indexOf("ODD_LEGAL")) {
+        const templates = await db.checklistTemplate.findMany({ orderBy: { sortOrder: "asc" } });
+        const pastOdd = stageIdx > STAGE_ORDER.indexOf("ODD_LEGAL");
+        const opsId = userIds["Alex Kim"]!;
+        const legalId = userIds["Priya Shah"]!;
+        await db.checklistItem.createMany({
+          data: templates.map((t, n) => {
+            // in-progress deal: first few items done; past deals: everything done
+            const done = pastOdd || n % 2 === 0;
+            return {
+              dealId: deal.id,
+              track: t.track,
+              label: t.label,
+              sortOrder: t.sortOrder,
+              done,
+              doneById: done ? (t.track === "ODD" ? opsId : legalId) : null,
+              doneAt: done ? enteredAt : null,
+            };
+          }),
+        });
+        if (pastOdd) {
+          await db.deal.update({
+            where: { id: deal.id },
+            data: { oddCompletedAt: enteredAt, oddCompletedById: opsId },
+          });
+          await db.document.createMany({
+            data: [
+              {
+                dealId: deal.id,
+                kind: "DDQ",
+                type: "LINK",
+                name: `${d.managerName} — DDQ`,
+                url: "https://example.com/docs",
+                version: 1,
+                uploadedById: opsId,
+              },
+              {
+                dealId: deal.id,
+                kind: "LPA",
+                type: "LINK",
+                name: `${d.managerName} — LPA (execution copy)`,
+                url: "https://example.com/docs",
+                version: 1,
+                uploadedById: legalId,
+              },
+              {
+                dealId: deal.id,
+                kind: "SUB_DOCS",
+                type: "LINK",
+                name: `${d.managerName} — Subscription docs`,
+                url: "https://example.com/docs",
+                version: 1,
+                uploadedById: legalId,
+              },
+            ],
+          });
+        }
+      }
+
+      // A live open follow-up on the in-progress pager deals for realism.
+      if (d.stage === "ONE_PAGER" || d.stage === "FIVE_PAGER") {
+        await db.followUp.create({
+          data: {
+            dealId: deal.id,
+            stage: d.stage,
+            title:
+              d.stage === "ONE_PAGER"
+                ? "Clarify capacity and expected launch AUM"
+                : "Follow up on track-record attribution questions from the team",
+            assigneeId: leadId,
+            createdById: userIds["Morgan Chen"]!,
+          },
+        });
+      }
     }
   }
 

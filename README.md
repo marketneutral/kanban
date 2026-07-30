@@ -40,8 +40,9 @@ Admin role for managing users, roles and asset classes at `/admin`.
 
 - **M1 (done)** — scaffold, schema, roster sign-in, kanban board with filters, deal
   CRUD + detail with audit trail, admin (users/roles/asset classes)
-- **M2** — workflow gate engine: hard gates on stage advancement (documents,
-  presentation records, follow-up resolution/waiver)
-- **M3** — documents (upload + link, versioned), ODD & Legal checklist tracks
+- **M2+M3 (done)** — workflow gate engine (`lib/workflow.ts`): hard, server-enforced
+  gates on stage advancement; follow-ups with resolve / lead-only waive; presentation
+  records; versioned documents (upload + link) with role-scoped kinds; ODD & Legal
+  parallel checklist tracks with Ops sign-off; gate readiness dots on the board
 - **M4** — approval chain: MD + Legal in parallel, then COO, then CEO; rejection flow
 - **M5** — reports (pipeline by stage × asset class, approval queue, workload), polish

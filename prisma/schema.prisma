@@ -25,6 +25,7 @@ model User {
   checklistDone ChecklistItem[]
   approvals     Approval[]
   events        StageEvent[]
+  oddCompleted  Deal[]               @relation("OddCompletedBy")
 
   createdAt DateTime @default(now())
 }
@@ -61,6 +62,11 @@ model Deal {
   status         String   @default("ACTIVE") // ACTIVE | ON_HOLD | PASSED | APPROVED
   passedReason   String?
   stageEnteredAt DateTime @default(now())
+
+  // set by Ops once the ODD checklist is complete; gates exit from ODD_LEGAL
+  oddCompletedAt   DateTime?
+  oddCompletedBy   User?     @relation("OddCompletedBy", fields: [oddCompletedById], references: [id])
+  oddCompletedById String?
 
   team           DealTeamMember[]
   followUps      FollowUp[]

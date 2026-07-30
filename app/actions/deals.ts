@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireUserAction } from "@/lib/session";
 import { canManageDeals, stageIndex, STAGES, STAGE_LABELS, type Stage } from "@/lib/types";
+import { evaluateGate, loadGateDeal, seedChecklists, unmetSummary } from "@/lib/workflow";
 
 async function requireDealManager() {
   const user = await requireUserAction();
@@ -84,16 +85,16 @@ export async function updateDeal(formData: FormData) {
 }
 
 /**
- * M1: simple forward/back movement restricted to deal managers, fully audited.
- * M2 replaces the interior of this action with hard gate checks (documents,
- * presentation records, open follow-ups) via lib/workflow.ts.
+ * Stage movement. Forward moves are hard-gated by lib/workflow.ts — the same
+ * evaluation the UI renders — so a card's column always means what it says.
+ * Send-backs are ungated but audited.
  */
 export async function moveStage(formData: FormData) {
   const user = await requireDealManager();
   const dealId = String(formData.get("dealId") ?? "");
   const direction = String(formData.get("direction") ?? "");
 
-  const deal = await db.deal.findUniqueOrThrow({ where: { id: dealId } });
+  const deal = await loadGateDeal(dealId);
   if (deal.status !== "ACTIVE") throw new Error("Deal is not active");
 
   const idx = stageIndex(deal.stage);
@@ -102,6 +103,13 @@ export async function moveStage(formData: FormData) {
   // APPROVED is only reachable via the approval chain (M4), never by manual move.
   if (STAGES[nextIdx] === "APPROVED") throw new Error("Approval is granted via the approval chain");
   const nextStage = STAGES[nextIdx] as Stage;
+
+  if (direction !== "back") {
+    const gate = evaluateGate(deal);
+    if (!gate.ready) {
+      throw new Error(`Gate not met — ${unmetSummary(gate)}`);
+    }
+  }
 
   await db.deal.update({
     where: { id: dealId },
@@ -120,6 +128,9 @@ export async function moveStage(formData: FormData) {
       },
     },
   });
+
+  if (nextStage === "ODD_LEGAL") await seedChecklists(dealId);
+
   revalidatePath("/board");
   revalidatePath(`/deals/${dealId}`);
 }

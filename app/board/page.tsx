@@ -2,6 +2,7 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/session";
 import { STAGES, STAGE_LABELS, canManageDeals } from "@/lib/types";
+import { evaluateGate, gateInclude } from "@/lib/workflow";
 import { fmtMm } from "@/lib/format";
 import FilterBar from "@/components/FilterBar";
 import DealCard from "@/components/DealCard";
@@ -27,6 +28,7 @@ export default async function BoardPage({
         assetClass: true,
         lead: true,
         _count: { select: { followUps: { where: { status: "OPEN" } } } },
+        ...gateInclude,
       },
       orderBy: { stageEnteredAt: "asc" },
     }),
@@ -83,7 +85,14 @@ export default async function BoardPage({
                 {cards.map((d) => (
                   <DealCard
                     key={d.id}
-                    deal={{ ...d, openFollowUps: d._count.followUps }}
+                    deal={{
+                      ...d,
+                      openFollowUps: d._count.followUps,
+                      gateReady:
+                        d.status === "ACTIVE" && !["APPROVALS", "APPROVED"].includes(d.stage)
+                          ? evaluateGate(d).ready
+                          : null,
+                    }}
                   />
                 ))}
                 {cards.length === 0 && (

@@ -11,6 +11,8 @@ export type DealCardData = {
   assetClass: { name: string };
   lead: { name: string };
   openFollowUps: number;
+  /** true = gate met, false = items open, null = not applicable */
+  gateReady: boolean | null;
 };
 
 export default function DealCard({ deal }: { deal: DealCardData }) {
@@ -64,8 +66,16 @@ export default function DealCard({ deal }: { deal: DealCardData }) {
       </div>
 
       <div className="mt-2.5 flex items-center justify-between text-[11px] text-stone-400">
-        <span className={days > 30 && !passed ? "font-medium text-amber-600" : ""}>
-          {days}d in stage
+        <span className="flex items-center gap-1.5">
+          {deal.gateReady !== null && (
+            <span
+              title={deal.gateReady ? "Gate met — ready to advance" : "Gate items open"}
+              className={`h-2 w-2 rounded-full ${deal.gateReady ? "bg-emerald-400" : "bg-amber-300"}`}
+            />
+          )}
+          <span className={days > 30 && !passed ? "font-medium text-amber-600" : ""}>
+            {days}d in stage
+          </span>
         </span>
         {deal.openFollowUps > 0 && (
           <span
