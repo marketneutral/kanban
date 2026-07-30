@@ -26,6 +26,7 @@ model User {
   approvals     Approval[]
   events        StageEvent[]
   oddCompleted  Deal[]               @relation("OddCompletedBy")
+  documentReviews DocumentReview[]
 
   createdAt DateTime @default(now())
 }
@@ -78,6 +79,7 @@ model Deal {
   approvals      Approval[]
   events         StageEvent[]
   presentations  PresentationRecord[]
+  documentReviews DocumentReview[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -125,6 +127,7 @@ model Document {
   uploadedBy   User     @relation(fields: [uploadedById], references: [id])
   uploadedById String
   createdAt    DateTime @default(now())
+  reviews      DocumentReview[]
 
   @@unique([dealId, kind, version])
 }
@@ -172,6 +175,32 @@ model StageEvent {
   action    String
   detail    String?
   createdAt DateTime @default(now())
+}
+
+// Admin-editable review standards: the prompt an AI review runs against,
+// per document kind (e.g. LPA legal standards, DDQ operational standards).
+model ReviewStandard {
+  id     String @id @default(cuid())
+  kind   String @unique // document kind this standard applies to
+  title  String
+  prompt String
+}
+
+model DocumentReview {
+  id          String   @id @default(cuid())
+  document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  documentId  String
+  deal        Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  dealId      String
+  model       String
+  status      String   @default("COMPLETE") // COMPLETE | FAILED
+  assessment  String? // STANDARD | NEGOTIABLE_ISSUES | SIGNIFICANT_CONCERNS
+  summary     String?
+  findings    String? // JSON array of findings
+  error       String?
+  requestedBy User     @relation(fields: [requestedById], references: [id])
+  requestedById String
+  createdAt   DateTime @default(now())
 }
 
 model PresentationRecord {

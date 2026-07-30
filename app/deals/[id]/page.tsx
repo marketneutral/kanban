@@ -14,7 +14,10 @@ import {
   type DealStatus,
 } from "@/lib/types";
 import { evaluateGate, evaluateLegal, evaluateChain } from "@/lib/workflow";
+import path from "path";
+import { aiConfigured, TEXT_EXTRACT_EXTS } from "@/lib/ai";
 import ApprovalChain from "@/components/deal/ApprovalChain";
+import AIReviews from "@/components/deal/AIReviews";
 import { fmtMm, fmtDate, daysSince, initials } from "@/lib/format";
 import GatePanel from "@/components/deal/GatePanel";
 import Documents from "@/components/deal/Documents";
@@ -40,6 +43,7 @@ const EVENT_LABELS: Record<string, string> = {
   ODD_COMPLETED: "signed off operational due diligence",
   IC_SCHEDULED: "put the deal on an IC agenda",
   IC_UNSCHEDULED: "removed the deal from the IC agenda",
+  AI_REVIEW_RUN: "ran an AI document review",
   APPROVAL_GRANTED: "signed an approval",
   APPROVAL_REJECTED: "rejected the deal at approval",
   DEAL_APPROVED: "gave final approval — deal approved",
@@ -57,6 +61,10 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
       oddCompletedBy: true,
       team: { include: { user: true } },
       documents: { include: { uploadedBy: true }, orderBy: { createdAt: "desc" } },
+      documentReviews: {
+        include: { requestedBy: true, document: true },
+        orderBy: { createdAt: "desc" },
+      },
       followUps: {
         include: { assignee: true, createdBy: true },
         orderBy: { createdAt: "desc" },
@@ -70,6 +78,18 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
   if (!deal) notFound();
 
   const users = await db.user.findMany({ where: { active: true }, orderBy: { name: "asc" } });
+  const standards = await db.reviewStandard.findMany({ select: { kind: true } });
+  const standardKinds = new Set(standards.map((s) => s.kind));
+  const reviewableIds = aiConfigured()
+    ? deal.documents
+        .filter(
+          (d) =>
+            standardKinds.has(d.kind) &&
+            d.type === "FILE" &&
+            (TEXT_EXTRACT_EXTS.has(path.extname(d.name).toLowerCase()) || d.previewPath)
+        )
+        .map((d) => d.id)
+    : [];
 
   const manager = canManageDeals(user);
   const admin = isAdmin(user);
@@ -205,7 +225,14 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
             )}
           </section>
 
-          <Documents dealId={deal.id} documents={deal.documents} canAttach={canAttach} />
+          <Documents
+            dealId={deal.id}
+            documents={deal.documents}
+            canAttach={canAttach}
+            reviewableIds={reviewableIds}
+          />
+
+          <AIReviews reviews={deal.documentReviews} />
 
           <FollowUps
             dealId={deal.id}

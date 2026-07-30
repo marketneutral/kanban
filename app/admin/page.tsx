@@ -9,6 +9,8 @@ import {
   createAssetClass,
   deleteAssetClass,
 } from "@/app/actions/admin";
+import { updateReviewStandard } from "@/app/actions/ai";
+import { aiConfigured, AI_MODEL } from "@/lib/ai";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +21,7 @@ export default async function AdminPage() {
   const user = await requireUser();
   if (!isAdmin(user)) redirect("/board");
 
-  const [users, assetClasses] = await Promise.all([
+  const [users, assetClasses, standards] = await Promise.all([
     db.user.findMany({
       include: { roles: true, _count: { select: { ledDeals: true } } },
       orderBy: { name: "asc" },
@@ -28,6 +30,7 @@ export default async function AdminPage() {
       include: { _count: { select: { deals: true } } },
       orderBy: { name: "asc" },
     }),
+    db.reviewStandard.findMany({ orderBy: { kind: "asc" } }),
   ]);
 
   return (
@@ -148,6 +151,53 @@ export default async function AdminPage() {
             Add
           </button>
         </form>
+      </section>
+
+      {/* AI review standards */}
+      <section className="mt-6 rounded-xl border border-stone-200 bg-white shadow-sm">
+        <header className="border-b border-stone-100 px-5 py-3">
+          <h2 className="text-sm font-semibold text-stone-900">✨ AI review standards</h2>
+          <p className="text-xs text-stone-500">
+            The standards each AI document review runs against.{" "}
+            {aiConfigured() ? (
+              <>
+                AI is <span className="font-medium text-emerald-600">enabled</span> via Azure
+                OpenAI (deployment: {AI_MODEL}).
+              </>
+            ) : (
+              <>
+                AI is <span className="font-medium text-amber-600">not configured</span> — set{" "}
+                <code className="font-mono">AZURE_OPENAI_ENDPOINT</code>,{" "}
+                <code className="font-mono">AZURE_OPENAI_API_KEY</code> and{" "}
+                <code className="font-mono">AZURE_OPENAI_DEPLOYMENT</code> to enable reviews.
+              </>
+            )}
+          </p>
+        </header>
+        <div className="divide-y divide-stone-100">
+          {standards.map((s) => (
+            <form key={s.id} action={updateReviewStandard} className="px-5 py-4">
+              <input type="hidden" name="kind" value={s.kind} />
+              <div className="flex items-center justify-between">
+                <h3 className="text-[13px] font-semibold text-stone-800">
+                  {s.title}{" "}
+                  <span className="font-mono text-[11px] font-normal text-stone-400">
+                    ({s.kind})
+                  </span>
+                </h3>
+                <button className="rounded-md bg-accent-700 px-3 py-1 text-[12px] font-medium text-white shadow-sm hover:bg-accent-800">
+                  Save
+                </button>
+              </div>
+              <textarea
+                name="prompt"
+                rows={8}
+                defaultValue={s.prompt}
+                className="mt-2 w-full rounded-md border border-stone-200 bg-white px-3 py-2 font-mono text-[12px] leading-relaxed text-stone-700 shadow-sm focus:border-accent-400 focus:outline-none"
+              />
+            </form>
+          ))}
+        </div>
       </section>
     </div>
   );

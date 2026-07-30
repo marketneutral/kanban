@@ -1,6 +1,7 @@
 import { DOC_KINDS, DOC_KIND_LABELS, type DocKind } from "@/lib/types";
 import { fmtDate } from "@/lib/format";
 import { addDocument } from "@/app/actions/documents";
+import { requestDocumentReview } from "@/app/actions/ai";
 
 type Doc = {
   id: string;
@@ -17,11 +18,15 @@ export default function Documents({
   dealId,
   documents,
   canAttach,
+  reviewableIds = [],
 }: {
   dealId: string;
   documents: Doc[];
   canAttach: boolean;
+  /** documents eligible for an AI review (standard exists + PDF available) */
+  reviewableIds?: string[];
 }) {
+  const reviewable = new Set(reviewableIds);
   const byKind = new Map<string, Doc[]>();
   for (const d of documents) {
     if (!byKind.has(d.kind)) byKind.set(d.kind, []);
@@ -75,6 +80,18 @@ export default function Documents({
                     >
                       ↓
                     </a>
+                  )}
+                  {reviewable.has(d.id) && (
+                    <form action={requestDocumentReview} className="shrink-0">
+                      <input type="hidden" name="documentId" value={d.id} />
+                      <button
+                        type="submit"
+                        title="Run AI review against firm standards (takes ~a minute)"
+                        className="rounded-md border border-accent-200 bg-accent-50 px-2 py-0.5 text-[11px] font-medium text-accent-800 hover:bg-accent-100"
+                      >
+                        ✨ AI review
+                      </button>
+                    </form>
                   )}
                 </li>
               ))}

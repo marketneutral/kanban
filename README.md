@@ -64,6 +64,28 @@ the `PORT` env var. Seeding is idempotent — `SEED=1` never duplicates data. On
 the container runs `prisma db push`, which also applies schema updates to an existing
 database.
 
+## ✨ AI document reviews (optional, via Azure OpenAI)
+
+Legal/Ops/deal team can run a one-click AI review of an uploaded LPA, sub docs, or DDQ.
+The document text is extracted server-side (native `.docx` via mammoth, `.pdf` via
+pdf-parse, other Office formats via their LibreOffice preview) and reviewed against the
+firm's **review standards** — admin-editable prompts at `/admin` covering fees,
+liquidity, key-man, GP removal, indemnification, MFN, and more. Results appear on the
+deal as an assessment plus severity-ranked findings with clause references, verbatim
+excerpts, and suggested negotiation asks — a first-pass lens for the professionals, not
+a substitute.
+
+```bash
+export AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
+export AZURE_OPENAI_API_KEY=...
+export AZURE_OPENAI_DEPLOYMENT=your-gpt-deployment    # must support structured outputs (json_schema)
+# optional: AZURE_OPENAI_API_VERSION (default 2024-10-21)
+```
+
+Without these the feature simply stays hidden. Reviews are audited like every other
+action. Scanned (image-only) documents aren't supported yet — extraction requires a
+text layer.
+
 ## Scripts
 
 | Command | What it does |

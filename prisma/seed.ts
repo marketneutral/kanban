@@ -65,6 +65,67 @@ async function main() {
     });
   }
 
+  const standards = [
+    {
+      kind: "LPA",
+      title: "LPA legal standards",
+      prompt: `Review this Limited Partnership Agreement against our standards as an institutional LP:
+
+FEES & ECONOMICS
+- Management fee at or below 2% (expect step-downs after the investment period); performance fee/carry at or below 20% with a preferred return of 7-8% and a full GP catch-up flagged for negotiation.
+- Fee offsets: 100% of transaction/monitoring/advisory fees should offset the management fee.
+- Organizational expense cap present and reasonable; flag unusual expense pass-throughs (e.g. GP overhead, placement fees charged to the fund).
+
+LIQUIDITY & STRUCTURE (where applicable)
+- Redemption terms, lock-ups, gates (fund- and investor-level), side pockets, and suspension rights — flag anything beyond market norms or with unbounded GP discretion.
+- In-kind distribution rights and their limits.
+
+GOVERNANCE & PROTECTIONS
+- Key person provision: triggers, consequences (investment period suspension), and cure mechanics must be present.
+- GP removal: for-cause removal threshold at or below 2/3 in interest; flag absence of no-fault removal.
+- LPAC composition and consent rights over conflicts, valuation, and extensions.
+- Indemnification/exculpation: standard of care no weaker than gross negligence/willful misconduct/fraud; flag indemnification for ordinary negligence or breach of the agreement itself.
+- Clawback: GP clawback present, ideally with interim true-ups and escrow or guarantees.
+
+TERMS & TRANSPARENCY
+- Side letter / MFN provision and its carve-outs (size-based tiers are common; flag broad carve-outs).
+- Reporting: audited annuals, quarterly unaudited, ILPA-style fee reporting.
+- Amendments: flag any ability to amend economic terms without affected-LP consent.
+- Successor fund restrictions during the investment period.
+
+Flag anything else a careful institutional LP would raise, including unusual or missing provisions.`,
+    },
+    {
+      kind: "SUB_DOCS",
+      title: "Subscription docs standards",
+      prompt: `Review these subscription documents as an institutional LP:
+- Representations we cannot make (e.g. ERISA status, sanctions/AML reps beyond standard scope, blanket tax indemnities) — flag anything unusual for an institutional allocator.
+- Confirm transfer restrictions match the LPA and note any additional GP consent rights.
+- Flag indemnities from the subscriber that go beyond breaches of the subscriber's own reps.
+- Note any power-of-attorney grants broader than administration of the subscription.
+- Check completeness: wire instructions, eligibility questionnaires, FATCA/CRS forms referenced.`,
+    },
+    {
+      kind: "DDQ",
+      title: "DDQ operational standards",
+      prompt: `Review this due diligence questionnaire as an operational due diligence analyst:
+- Service providers: independent administrator, auditor (recognized firm), prime broker/custodian named; flag any self-administration or affiliated providers.
+- Valuation: independent pricing sources and a documented valuation policy for hard-to-value assets.
+- NAV controls: who calculates, who reconciles, frequency; flag GP-only control.
+- Compliance: registered status, compliance officer, personal trading policy, regulatory actions or litigation disclosed.
+- Business continuity, cybersecurity, and key-person operational dependencies.
+- Counterparty and cash management controls: dual authorization on wires, segregation of duties.
+- Flag inconsistencies, evasive answers, or material omissions a careful ODD analyst would chase.`,
+    },
+  ];
+  for (const s of standards) {
+    await db.reviewStandard.upsert({
+      where: { kind: s.kind },
+      update: {},
+      create: s,
+    });
+  }
+
   if ((await db.deal.count()) === 0) {
     const deals = [
       {
