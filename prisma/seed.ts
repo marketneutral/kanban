@@ -1,8 +1,9 @@
 import { PrismaClient } from "@prisma/client";
-import { copyFile, mkdir } from "fs/promises";
+import { copyFile, mkdir, writeFile } from "fs/promises";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import path from "path";
+import { buildDealDoc, type DocDeal } from "./seed-docs";
 
 const db = new PrismaClient();
 const execFileAsync = promisify(execFile);
@@ -56,6 +57,35 @@ async function seedAsset(opts: {
     },
   });
   return doc.id;
+}
+
+/** Write a generated sample PDF into uploads and attach it as a document. */
+async function seedGeneratedDoc(opts: {
+  dealId: string;
+  kind: string;
+  deal: DocDeal;
+  uploadedById: string;
+  createdAt?: Date;
+}) {
+  const { name, bytes } = buildDealDoc(opts.kind, opts.deal);
+  const safeName = name.replace(/[^\w.\- ]+/g, "_");
+  const relPath = path.join(opts.dealId, `${opts.kind.toLowerCase()}-v1-${safeName}`);
+  const absPath = path.join(UPLOAD_ROOT, relPath);
+  await mkdir(path.dirname(absPath), { recursive: true });
+  await writeFile(absPath, bytes);
+  await db.document.create({
+    data: {
+      dealId: opts.dealId,
+      kind: opts.kind,
+      version: 1,
+      type: "FILE",
+      name,
+      path: relPath,
+      uploadedById: opts.uploadedById,
+      note: "Sample document (seeded)",
+      ...(opts.createdAt ? { createdAt: opts.createdAt } : {}),
+    },
+  });
 }
 
 async function main() {
@@ -260,7 +290,20 @@ Flag anything else a careful institutional LP would raise, including unusual or 
   });
 
   if ((await db.deal.count()) === 0) {
-    const deals = [
+    type SeedDeal = {
+      managerName: string;
+      fundName: string;
+      assetClass: string;
+      strategy: string;
+      targetSizeMm: number;
+      lead: string;
+      team: string[];
+      source: string;
+      stage: string;
+      daysAgo: number;
+      status?: "ON_HOLD";
+    };
+    const deals: SeedDeal[] = [
       {
         managerName: "Blackwood Capital",
         fundName: "Blackwood Credit Opportunities III",
@@ -346,6 +389,40 @@ Flag anything else a careful institutional LP would raise, including unusual or 
         stage: "APPROVED",
         daysAgo: 45,
       },
+
+      // ---- volume roster: 25 more deals so the map has real texture --------
+      // Private Equity
+      { managerName: "Tallowfield", fundName: "Tallowfield Buyout Partners VI", assetClass: "Private Equity", strategy: "Upper mid-market buyout", targetSizeMm: 350, lead: "Ines Delgado", team: ["Marcus Webb", "Grace Kimball"], source: "Re-up — existing GP", stage: "PROPOSAL", daysAgo: 21 },
+      { managerName: "Corvid Bay", fundName: "Corvid Bay Capital IV", assetClass: "Private Equity", strategy: "Industrials buyout", targetSizeMm: 150, lead: "Marcus Webb", team: ["Nadia Osei"], source: "Placement agent", stage: "ONE_PAGER", daysAgo: 9 },
+      { managerName: "Juniper Hollow", fundName: "Juniper Hollow Growth II", assetClass: "Private Equity", strategy: "Growth equity — software", targetSizeMm: 90, lead: "Grace Kimball", team: ["Tom Nakamura"], source: "LP network", stage: "PIPELINE", daysAgo: 6 },
+      { managerName: "Ashcombe Partners", fundName: "Ashcombe Secondaries III", assetClass: "Private Equity", strategy: "GP-led secondaries", targetSizeMm: 200, lead: "Nadia Osei", team: ["Ines Delgado", "Jordan Lee"], source: "Conference — SuperReturn", stage: "APPROVALS", daysAgo: 5 },
+      { managerName: "Redwater", fundName: "Redwater Special Situations II", assetClass: "Private Equity", strategy: "Special situations", targetSizeMm: 120, lead: "Tom Nakamura", team: ["Marcus Webb"], source: "Existing manager referral", stage: "FIVE_PAGER", daysAgo: 33 },
+      // Credit
+      { managerName: "Pelagic Point", fundName: "Pelagic Point Direct Lending III", assetClass: "Credit", strategy: "Senior direct lending", targetSizeMm: 65, lead: "Jordan Lee", team: ["Nadia Osei", "Sam Rivera"], source: "Prime broker cap intro", stage: "ODD_LEGAL", daysAgo: 14 },
+      { managerName: "Marlowe Street", fundName: "Marlowe Street CLO Opportunities", assetClass: "Credit", strategy: "CLO equity and mezz", targetSizeMm: 40, lead: "Sam Rivera", team: ["Marcus Webb"], source: "Conference — Milken", stage: "PIPELINE", daysAgo: 2 },
+      { managerName: "Fenwick Harbor", fundName: "Fenwick Harbor ABL Fund", assetClass: "Credit", strategy: "Asset-based lending", targetSizeMm: 55, lead: "Nadia Osei", team: ["Jordan Lee"], source: "LP network", stage: "PROPOSAL", daysAgo: 27 },
+      { managerName: "Kestrel Rock", fundName: "Kestrel Rock EM Credit", assetClass: "Credit", strategy: "EM sovereign & corporate credit", targetSizeMm: 28, lead: "Tom Nakamura", team: ["Sam Rivera"], source: "Existing manager referral", stage: "ONE_PAGER", daysAgo: 19 },
+      // Equity Long/Short
+      { managerName: "Bright Harbor", fundName: "Bright Harbor Healthcare Fund", assetClass: "Equity Long/Short", strategy: "Healthcare long/short", targetSizeMm: 45, lead: "Sam Rivera", team: ["Tom Nakamura", "Morgan Chen"], source: "Cap intro", stage: "FIVE_PAGER", daysAgo: 16 },
+      { managerName: "Stonemill", fundName: "Stonemill Market Neutral", assetClass: "Equity Long/Short", strategy: "Quant market neutral", targetSizeMm: 30, lead: "Morgan Chen", team: ["Jordan Lee"], source: "Existing relationship", stage: "ONE_PAGER", daysAgo: 7 },
+      { managerName: "Vantage Row", fundName: "Vantage Row Consumer Fund", assetClass: "Equity Long/Short", strategy: "Consumer long/short", targetSizeMm: 20, lead: "Jordan Lee", team: [], source: "Conference — Sohn", stage: "PIPELINE", daysAgo: 24, status: "ON_HOLD" },
+      { managerName: "Osprey Field", fundName: "Osprey Field Energy Transition", assetClass: "Equity Long/Short", strategy: "Energy transition long/short", targetSizeMm: 70, lead: "Nadia Osei", team: ["Sam Rivera", "Ines Delgado"], source: "LP network", stage: "PROPOSAL", daysAgo: 11 },
+      // Global Macro
+      { managerName: "Aurora Strait", fundName: "Aurora Strait Systematic Macro", assetClass: "Global Macro", strategy: "Systematic macro / trend", targetSizeMm: 85, lead: "Tom Nakamura", team: ["Nadia Osei"], source: "Database screen", stage: "FIVE_PAGER", daysAgo: 29 },
+      { managerName: "Cobalt Basin", fundName: "Cobalt Basin Rates Fund", assetClass: "Global Macro", strategy: "Rates relative value", targetSizeMm: 60, lead: "Marcus Webb", team: ["Jordan Lee", "Tom Nakamura"], source: "Prime broker cap intro", stage: "ODD_LEGAL", daysAgo: 37, status: "ON_HOLD" },
+      { managerName: "Thornbury", fundName: "Thornbury FX Macro", assetClass: "Global Macro", strategy: "Discretionary FX macro", targetSizeMm: 35, lead: "Ines Delgado", team: ["Sam Rivera"], source: "Existing manager referral", stage: "PIPELINE", daysAgo: 3 },
+      // Multi-Strategy
+      { managerName: "Granite Verge", fundName: "Granite Verge Multi-Strategy", assetClass: "Multi-Strategy", strategy: "Multi-PM platform", targetSizeMm: 250, lead: "Sam Rivera", team: ["Jordan Lee", "Morgan Chen"], source: "Existing relationship", stage: "APPROVALS", daysAgo: 8 },
+      { managerName: "Loch Arden", fundName: "Loch Arden Event Fund", assetClass: "Multi-Strategy", strategy: "Event-driven multi-strategy", targetSizeMm: 110, lead: "Jordan Lee", team: ["Marcus Webb", "Nadia Osei"], source: "Cap intro", stage: "ONE_PAGER", daysAgo: 38 },
+      { managerName: "Halewood", fundName: "Halewood Relative Value", assetClass: "Multi-Strategy", strategy: "Fixed income relative value", targetSizeMm: 180, lead: "Nadia Osei", team: ["Tom Nakamura"], source: "Placement agent", stage: "PIPELINE", daysAgo: 13 },
+      // Venture Capital
+      { managerName: "Northgale", fundName: "Northgale Ventures I", assetClass: "Venture Capital", strategy: "Fintech seed", targetSizeMm: 15, lead: "Tom Nakamura", team: ["Ines Delgado"], source: "LP network", stage: "ONE_PAGER", daysAgo: 22 },
+      { managerName: "Solent Grove", fundName: "Solent Grove Bio Fund III", assetClass: "Venture Capital", strategy: "Early-stage biotech", targetSizeMm: 25, lead: "Ines Delgado", team: ["Grace Kimball", "Jordan Lee"], source: "Existing GP referral", stage: "FIVE_PAGER", daysAgo: 42 },
+      { managerName: "Ember Vale", fundName: "Ember Vale Deep Tech", assetClass: "Venture Capital", strategy: "Deep tech / hardware", targetSizeMm: 8, lead: "Sam Rivera", team: ["Tom Nakamura"], source: "Conference — Slush", stage: "PIPELINE", daysAgo: 5 },
+      // Real Assets
+      { managerName: "Wrenfield", fundName: "Wrenfield Agriculture Partners", assetClass: "Real Assets", strategy: "Row-crop farmland", targetSizeMm: 140, lead: "Marcus Webb", team: ["Grace Kimball", "Sam Rivera"], source: "Placement agent", stage: "ODD_LEGAL", daysAgo: 41 },
+      { managerName: "Calder Bay", fundName: "Calder Bay Renewables V", assetClass: "Real Assets", strategy: "Renewables infrastructure", targetSizeMm: 500, lead: "Jordan Lee", team: ["Ines Delgado", "Nadia Osei"], source: "Re-up — existing GP", stage: "PROPOSAL", daysAgo: 17 },
+      { managerName: "Dunmore", fundName: "Dunmore Timberland Fund II", assetClass: "Real Assets", strategy: "Timberland", targetSizeMm: 45, lead: "Nadia Osei", team: ["Marcus Webb"], source: "LP network", stage: "APPROVED", daysAgo: 10 },
     ];
 
     const STAGE_ORDER = [
@@ -404,17 +481,12 @@ Flag anything else a careful institutional LP would raise, including unusual or 
         const when = new Date(enteredAt.getTime() - (stageIdx - i) * 7 * 86_400_000);
         const docKind = STAGE_DOCS[passedStage];
         if (docKind) {
-          await db.document.create({
-            data: {
-              dealId: deal.id,
-              kind: docKind,
-              type: "LINK",
-              name: `${d.managerName} — ${docKind === "ONE_PAGER" ? "One-Pager" : docKind === "FIVE_PAGER" ? "Five-Pager" : "Investment Proposal"}`,
-              url: "https://example.com/docs",
-              version: 1,
-              uploadedById: leadId,
-              createdAt: when,
-            },
+          await seedGeneratedDoc({
+            dealId: deal.id,
+            kind: docKind,
+            deal: d,
+            uploadedById: leadId,
+            createdAt: when,
           });
           await db.presentationRecord.create({
             data: { dealId: deal.id, stage: passedStage, presentedAt: when },
@@ -459,37 +531,19 @@ Flag anything else a careful institutional LP would raise, including unusual or 
             where: { id: deal.id },
             data: { oddCompletedAt: enteredAt, oddCompletedById: opsId },
           });
-          await db.document.createMany({
-            data: [
-              {
-                dealId: deal.id,
-                kind: "DDQ",
-                type: "LINK",
-                name: `${d.managerName} — DDQ`,
-                url: "https://example.com/docs",
-                version: 1,
-                uploadedById: opsId,
-              },
-              {
-                dealId: deal.id,
-                kind: "LPA",
-                type: "LINK",
-                name: `${d.managerName} — LPA (execution copy)`,
-                url: "https://example.com/docs",
-                version: 1,
-                uploadedById: legalId,
-              },
-              {
-                dealId: deal.id,
-                kind: "SUB_DOCS",
-                type: "LINK",
-                name: `${d.managerName} — Subscription docs`,
-                url: "https://example.com/docs",
-                version: 1,
-                uploadedById: legalId,
-              },
-            ],
-          });
+          for (const [kind, byId] of [
+            ["DDQ", opsId],
+            ["LPA", legalId],
+            ["SUB_DOCS", legalId],
+          ] as const) {
+            await seedGeneratedDoc({
+              dealId: deal.id,
+              kind,
+              deal: d,
+              uploadedById: byId,
+              createdAt: enteredAt,
+            });
+          }
         }
       }
 
@@ -505,9 +559,16 @@ Flag anything else a careful institutional LP would raise, including unusual or 
           CFO: userIds["Taylor Brooks"]!,
           CEO: userIds["Casey Whitfield"]!,
         };
+        // Mid-chain deals sit at different points so every reports queue has
+        // work: Ironbark waits on the CFO, the other two on their MDs.
+        const midChainSigned: Record<string, string[]> = {
+          Ironbark: ["MD", "LEGAL"],
+          "Granite Verge": ["LEGAL"],
+          "Ashcombe Partners": ["LEGAL"],
+        };
         for (const step of ["MD", "LEGAL", "CFO", "CEO"]) {
-          // Ironbark mid-chain: MD + Legal signed, CFO/CEO pending
-          const signed = finalized || step === "MD" || step === "LEGAL";
+          const signed =
+            finalized || (midChainSigned[d.managerName] ?? ["MD", "LEGAL"]).includes(step);
           await db.approval.create({
             data: {
               dealId: deal.id,
@@ -521,6 +582,17 @@ Flag anything else a careful institutional LP would raise, including unusual or 
         if (finalized) {
           await db.deal.update({ where: { id: deal.id }, data: { status: "APPROVED" } });
         }
+      }
+
+      // A couple of deals sit on hold for board/map texture.
+      if (d.status === "ON_HOLD") {
+        await db.deal.update({
+          where: { id: deal.id },
+          data: {
+            status: "ON_HOLD",
+            events: { create: { actorId: leadId, action: "STATUS_ON_HOLD" } },
+          },
+        });
       }
 
       // Westgate is the closed-and-funded example: wired a month ago.
@@ -556,7 +628,7 @@ Flag anything else a careful institutional LP would raise, including unusual or 
   // Sample files: decks, LPA, sub docs, DDQ — real uploads the demo can open,
   // preview, AI-review, and profile-extract.
   const deckDocIds: Record<string, string> = {};
-  if ((await db.document.count({ where: { type: "FILE" } })) === 0) {
+  if ((await db.document.count({ where: { kind: "PITCH_DECK" } })) === 0) {
     const byName = async (name: string) =>
       (await db.deal.findFirst({ where: { managerName: name } }))?.id;
     const uid = async (name: string) =>
