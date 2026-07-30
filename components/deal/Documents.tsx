@@ -2,6 +2,7 @@ import { DOC_KINDS, DOC_KIND_LABELS, type DocKind } from "@/lib/types";
 import { fmtDate } from "@/lib/format";
 import { addDocument } from "@/app/actions/documents";
 import { requestDocumentReview } from "@/app/actions/ai";
+import { buildProfileFromDocument } from "@/app/actions/profile";
 
 type Doc = {
   id: string;
@@ -19,14 +20,18 @@ export default function Documents({
   documents,
   canAttach,
   reviewableIds = [],
+  profileableIds = [],
 }: {
   dealId: string;
   documents: Doc[];
   canAttach: boolean;
   /** documents eligible for an AI review (standard exists + PDF available) */
   reviewableIds?: string[];
+  /** pitch decks eligible for AI profile extraction */
+  profileableIds?: string[];
 }) {
   const reviewable = new Set(reviewableIds);
+  const profileable = new Set(profileableIds ?? []);
   const byKind = new Map<string, Doc[]>();
   for (const d of documents) {
     if (!byKind.has(d.kind)) byKind.set(d.kind, []);
@@ -80,6 +85,18 @@ export default function Documents({
                     >
                       ↓
                     </a>
+                  )}
+                  {profileable.has(d.id) && (
+                    <form action={buildProfileFromDocument} className="shrink-0">
+                      <input type="hidden" name="documentId" value={d.id} />
+                      <button
+                        type="submit"
+                        title="Extract the manager profile from this deck (takes ~a minute)"
+                        className="rounded-md border border-accent-200 bg-accent-50 px-2 py-0.5 text-[11px] font-medium text-accent-800 hover:bg-accent-100"
+                      >
+                        ✨ Extract profile
+                      </button>
+                    </form>
                   )}
                   {reviewable.has(d.id) && (
                     <form action={requestDocumentReview} className="shrink-0">

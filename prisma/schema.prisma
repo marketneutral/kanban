@@ -27,6 +27,7 @@ model User {
   events        StageEvent[]
   oddCompleted  Deal[]               @relation("OddCompletedBy")
   documentReviews DocumentReview[]
+  dealProfiles  DealProfile[]
 
   createdAt DateTime @default(now())
 }
@@ -80,6 +81,7 @@ model Deal {
   events         StageEvent[]
   presentations  PresentationRecord[]
   documentReviews DocumentReview[]
+  profile        DealProfile?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -128,6 +130,7 @@ model Document {
   uploadedById String
   createdAt    DateTime @default(now())
   reviews      DocumentReview[]
+  profiles     DealProfile[]
 
   @@unique([dealId, kind, version])
 }
@@ -175,6 +178,31 @@ model StageEvent {
   action    String
   detail    String?
   createdAt DateTime @default(now())
+}
+
+// AI-extracted manager profile built from a pitch deck: key people, terms,
+// deadlines, and track record (returns series or prior-fund history).
+model DealProfile {
+  id               String    @id @default(cuid())
+  deal             Deal      @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  dealId           String    @unique
+  sourceDocument   Document? @relation(fields: [sourceDocumentId], references: [id], onDelete: SetNull)
+  sourceDocumentId String?
+  managerType      String // HEDGE_FUND | PRIVATE_MARKETS | OTHER
+  data             String // JSON: firm, keyPeople, keyTerms, deadlines, trackRecord, notes
+  model            String
+  createdBy        User      @relation(fields: [createdById], references: [id])
+  createdById      String
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
+
+// Reference datasets for charts (e.g. PE fund TVPI quintiles by vintage).
+model Benchmark {
+  id   String @id @default(cuid())
+  name String @unique
+  kind String // PE_QUINTILES
+  data String // JSON
 }
 
 // Admin-editable review standards: the prompt an AI review runs against,

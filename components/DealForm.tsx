@@ -98,7 +98,7 @@ export default function DealForm({
                 name="teamIds"
                 value={u.id}
                 defaultChecked={teamIds.has(u.id)}
-                className="accent-[#276365]"
+                className="accent-[#235a92]"
               />
               {u.name}
             </label>

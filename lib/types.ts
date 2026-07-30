@@ -43,6 +43,7 @@ export const DEAL_STATUS_LABELS: Record<DealStatus, string> = {
 };
 
 export const DOC_KINDS = [
+  "PITCH_DECK",
   "ONE_PAGER",
   "FIVE_PAGER",
   "DDQ",
@@ -55,6 +56,7 @@ export const DOC_KINDS = [
 export type DocKind = (typeof DOC_KINDS)[number];
 
 export const DOC_KIND_LABELS: Record<DocKind, string> = {
+  PITCH_DECK: "Pitch Deck",
   ONE_PAGER: "One-Pager",
   FIVE_PAGER: "Five-Pager",
   DDQ: "DDQ",

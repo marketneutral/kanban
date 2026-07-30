@@ -86,6 +86,26 @@ Without these the feature simply stays hidden. Reviews are audited like every ot
 action. Scanned (image-only) documents aren't supported yet — extraction requires a
 text layer.
 
+## ✨ Deal-card autofill from a pitch deck
+
+On **New deal**, upload the manager's deck (PDF, docx, pptx…) and the app creates the
+card for you — manager, fund, asset class, strategy, size — plus a full **manager
+profile** on the deal: key people, commercial terms, known deadlines, and the track
+record charted:
+
+- **Hedge funds** — cumulative net return vs. the benchmark named in the deck, with
+  CAGR / vol / Sharpe / max-drawdown chips (figures transcribed from the deck, never
+  invented).
+- **Private markets** — prior-fund DPI and TVPI by vintage year, plotted against
+  benchmark TVPI quintile bands (seeded with an illustrative dataset — replace the
+  `Benchmark` row with your provider's quintiles), plus a fund-history table.
+
+The deck is attached to the deal as a Pitch Deck document; "✨ Extract profile" on any
+attached deck (re)builds the profile. Everything stays editable, and every extraction is
+audited. Uses the same Azure OpenAI configuration as document reviews. The seed ships
+sample assets — two decks, an LPA with deliberately off-market terms, sub docs, a DDQ,
+and a one-pager — so every AI feature is demoable immediately.
+
 ## Scripts
 
 | Command | What it does |

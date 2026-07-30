@@ -1,13 +1,10 @@
 "use server";
 
-import { mkdir, writeFile } from "fs/promises";
-import path from "path";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireUserAction } from "@/lib/session";
 import { canManageDeals, hasRole, isAdmin, DOC_KINDS, type DocKind } from "@/lib/types";
-import { UPLOAD_ROOT } from "@/lib/uploads";
-import { generatePdfPreview } from "@/lib/convert";
+import { saveDocumentFile } from "@/lib/documents";
 
 const OPS_KINDS: DocKind[] = ["DDQ", "ODD_REPORT"];
 const LEGAL_KINDS: DocKind[] = ["LPA", "SUB_DOCS"];
@@ -42,32 +39,31 @@ export async function addDocument(formData: FormData) {
   });
   const version = (last?.version ?? 0) + 1;
 
-  let data;
+  let created;
   if (hasFile) {
     const f = file as File;
-    if (f.size > 25 * 1024 * 1024) throw new Error("File too large (25 MB max)");
-    const safeName = f.name.replace(/[^\w.\- ]+/g, "_").slice(-120);
-    const relPath = path.join(dealId, `${kind.toLowerCase()}-v${version}-${safeName}`);
-    const absPath = path.join(UPLOAD_ROOT, relPath);
-    await mkdir(path.dirname(absPath), { recursive: true });
-    await writeFile(absPath, Buffer.from(await f.arrayBuffer()));
-    const previewPath = await generatePdfPreview(relPath);
-    data = { type: "FILE", name: f.name, path: relPath, url: null, previewPath };
+    created = await saveDocumentFile(
+      dealId,
+      kind,
+      f.name,
+      Buffer.from(await f.arrayBuffer()),
+      user.id,
+      note
+    );
   } else {
     if (!/^https?:\/\//i.test(url)) throw new Error("Link must start with http(s)://");
     const name = String(formData.get("name") ?? "").trim() || url;
-    data = { type: "LINK", name, path: null, url };
+    created = await db.document.create({
+      data: { dealId, kind, version, note, uploadedById: user.id, type: "LINK", name, url },
+    });
   }
 
-  await db.document.create({
-    data: { dealId, kind, version, note, uploadedById: user.id, ...data },
-  });
   await db.stageEvent.create({
     data: {
       dealId,
       actorId: user.id,
       action: "DOCUMENT_ADDED",
-      detail: JSON.stringify({ kind, version, name: data.name }),
+      detail: JSON.stringify({ kind, version: created.version, name: created.name }),
     },
   });
   revalidatePath("/board");

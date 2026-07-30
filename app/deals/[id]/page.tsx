@@ -18,6 +18,7 @@ import path from "path";
 import { aiConfigured, TEXT_EXTRACT_EXTS } from "@/lib/ai";
 import ApprovalChain from "@/components/deal/ApprovalChain";
 import AIReviews from "@/components/deal/AIReviews";
+import ProfilePanel from "@/components/deal/ProfilePanel";
 import { fmtMm, fmtDate, daysSince, initials } from "@/lib/format";
 import GatePanel from "@/components/deal/GatePanel";
 import Documents from "@/components/deal/Documents";
@@ -44,6 +45,7 @@ const EVENT_LABELS: Record<string, string> = {
   IC_SCHEDULED: "put the deal on an IC agenda",
   IC_UNSCHEDULED: "removed the deal from the IC agenda",
   AI_REVIEW_RUN: "ran an AI document review",
+  AI_PROFILE_BUILT: "built the AI manager profile",
   APPROVAL_GRANTED: "signed an approval",
   APPROVAL_REJECTED: "rejected the deal at approval",
   DEAL_APPROVED: "gave final approval — deal approved",
@@ -65,6 +67,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
         include: { requestedBy: true, document: true },
         orderBy: { createdAt: "desc" },
       },
+      profile: { include: { createdBy: true, sourceDocument: true } },
       followUps: {
         include: { assignee: true, createdBy: true },
         orderBy: { createdAt: "desc" },
@@ -80,6 +83,15 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
   const users = await db.user.findMany({ where: { active: true }, orderBy: { name: "asc" } });
   const standards = await db.reviewStandard.findMany({ select: { kind: true } });
   const standardKinds = new Set(standards.map((s) => s.kind));
+  const peBenchmark = await db.benchmark.findFirst({ where: { kind: "PE_QUINTILES" } });
+  const profileData = deal.profile
+    ? (JSON.parse(deal.profile.data) as import("@/lib/ai").DeckProfile)
+    : null;
+  const profileableIds = aiConfigured()
+    ? deal.documents
+        .filter((d) => d.kind === "PITCH_DECK" && d.type === "FILE")
+        .map((d) => d.id)
+    : [];
   const reviewableIds = aiConfigured()
     ? deal.documents
         .filter(
@@ -225,11 +237,27 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
             )}
           </section>
 
+          {deal.profile && profileData && (
+            <ProfilePanel
+              profile={profileData}
+              managerType={deal.profile.managerType}
+              model={deal.profile.model}
+              createdAt={deal.profile.updatedAt}
+              createdBy={deal.profile.createdBy.name}
+              sourceDocId={deal.profile.sourceDocument?.id ?? null}
+              sourceDocName={deal.profile.sourceDocument?.name ?? null}
+              quintiles={peBenchmark ? JSON.parse(peBenchmark.data) : null}
+              quintilesName={peBenchmark?.name ?? null}
+              fundLabel={deal.fundName}
+            />
+          )}
+
           <Documents
             dealId={deal.id}
             documents={deal.documents}
             canAttach={canAttach}
             reviewableIds={reviewableIds}
+            profileableIds={manager ? profileableIds : []}
           />
 
           <AIReviews reviews={deal.documentReviews} />

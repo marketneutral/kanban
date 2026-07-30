@@ -1,13 +1,10 @@
 import { AzureOpenAI } from "openai";
-import { readFile } from "fs/promises";
 import path from "path";
-import { PDFParse } from "pdf-parse";
-import mammoth from "mammoth";
 import { db } from "@/lib/db";
 import { UPLOAD_ROOT } from "@/lib/uploads";
+import { extractDocumentText } from "@/lib/extract";
 
-/** Extensions we can extract text from directly, without a PDF conversion. */
-export const TEXT_EXTRACT_EXTS = new Set([".pdf", ".docx", ".txt", ".md"]);
+export { TEXT_EXTRACT_EXTS } from "@/lib/extract";
 
 /**
  * AI document reviews via Azure OpenAI.
@@ -86,14 +83,12 @@ const REVIEW_SCHEMA = {
 // generous cap that stays well inside a 128K-token context window
 const MAX_DOC_CHARS = 350_000;
 
-async function extractPdfText(absPath: string): Promise<string> {
-  const parser = new PDFParse({ data: new Uint8Array(await readFile(absPath)) });
-  try {
-    const result = await parser.getText();
-    return result.text ?? "";
-  } finally {
-    await parser.destroy().catch(() => {});
-  }
+export function azureClient(): AzureOpenAI {
+  return new AzureOpenAI({
+    endpoint: process.env.AZURE_OPENAI_ENDPOINT,
+    apiKey: process.env.AZURE_OPENAI_API_KEY,
+    apiVersion: process.env.AZURE_OPENAI_API_VERSION ?? "2024-10-21",
+  });
 }
 
 /**
@@ -110,28 +105,15 @@ export async function runDocumentReview(documentId: string): Promise<ReviewResul
   const standard = await db.reviewStandard.findUnique({ where: { kind: doc.kind } });
   if (!standard) throw new Error("No review standard is configured for this document kind");
 
-  // Extract text natively from docx/pdf/plain text; anything else falls back
-  // to the LibreOffice-converted PDF preview.
-  const ext = path.extname(doc.name).toLowerCase();
-  let docText = "";
-  if (doc.type === "FILE" && doc.path) {
-    const abs = path.join(UPLOAD_ROOT, doc.path);
-    if (ext === ".docx") {
-      docText = (await mammoth.extractRawText({ path: abs })).value;
-    } else if (ext === ".pdf") {
-      docText = await extractPdfText(abs);
-    } else if (ext === ".txt" || ext === ".md") {
-      docText = (await readFile(abs)).toString("utf-8");
-    } else if (doc.previewPath) {
-      docText = await extractPdfText(path.join(UPLOAD_ROOT, doc.previewPath));
-    } else {
-      throw new Error(`No text extraction available for ${ext || "this file type"}`);
-    }
-  } else {
+  if (doc.type !== "FILE" || !doc.path) {
     throw new Error("AI review needs an uploaded file — links can't be reviewed");
   }
-
-  docText = docText.trim();
+  let docText = (
+    await extractDocumentText(
+      path.join(UPLOAD_ROOT, doc.path),
+      doc.previewPath ? path.join(UPLOAD_ROOT, doc.previewPath) : null
+    )
+  ).trim();
   if (!docText) {
     throw new Error(
       "No text could be extracted from this document — it may be a scanned image (OCR is not supported yet)"
@@ -143,11 +125,7 @@ export async function runDocumentReview(documentId: string): Promise<ReviewResul
     truncated = true;
   }
 
-  const client = new AzureOpenAI({
-    endpoint: process.env.AZURE_OPENAI_ENDPOINT,
-    apiKey: process.env.AZURE_OPENAI_API_KEY,
-    apiVersion: process.env.AZURE_OPENAI_API_VERSION ?? "2024-10-21",
-  });
+  const client = azureClient();
 
   const completion = await client.chat.completions.create({
     model: AI_MODEL, // Azure deployment name
@@ -187,4 +165,237 @@ export async function runDocumentReview(documentId: string): Promise<ReviewResul
   const content = choice?.message?.content;
   if (!content) throw new Error("The model returned no review");
   return JSON.parse(content) as ReviewResult;
+}
+
+// ---------------------------------------------------------- deck extraction
+
+export type DeckProfile = {
+  managerType: "HEDGE_FUND" | "PRIVATE_MARKETS" | "OTHER";
+  summary: string;
+  card: {
+    managerName: string;
+    fundName: string;
+    assetClassName: string;
+    strategy: string;
+    targetSizeMm: number | null;
+  };
+  firm: { aum: string; founded: string; headquarters: string };
+  keyPeople: { name: string; role: string; background: string }[];
+  keyTerms: { term: string; value: string }[];
+  deadlines: { date: string; label: string }[];
+  trackRecord: {
+    benchmarkName: string;
+    returnsSeries: { period: string; fundPct: number; benchmarkPct: number | null }[];
+    funds: {
+      name: string;
+      vintage: number | null;
+      sizeMm: number | null;
+      netIrrPct: number | null;
+      dpi: number | null;
+      tvpi: number | null;
+      status: string;
+    }[];
+  };
+  notes: string;
+};
+
+const DECK_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "managerType",
+    "summary",
+    "card",
+    "firm",
+    "keyPeople",
+    "keyTerms",
+    "deadlines",
+    "trackRecord",
+    "notes",
+  ],
+  properties: {
+    managerType: {
+      type: "string",
+      enum: ["HEDGE_FUND", "PRIVATE_MARKETS", "OTHER"],
+      description:
+        "HEDGE_FUND for open-ended vehicles reporting periodic returns; PRIVATE_MARKETS for closed-end funds with vintages and DPI/TVPI",
+    },
+    summary: { type: "string", description: "3-4 sentence summary of the manager and offering" },
+    card: {
+      type: "object",
+      additionalProperties: false,
+      required: ["managerName", "fundName", "assetClassName", "strategy", "targetSizeMm"],
+      properties: {
+        managerName: { type: "string", description: "Management firm name" },
+        fundName: { type: "string", description: "Fund/vehicle being offered" },
+        assetClassName: {
+          type: "string",
+          description: "Best match from the provided asset class list, verbatim",
+        },
+        strategy: { type: "string", description: "One-line strategy description" },
+        targetSizeMm: {
+          type: ["number", "null"],
+          description: "Fund target size or our indicative allocation, in USD millions",
+        },
+      },
+    },
+    firm: {
+      type: "object",
+      additionalProperties: false,
+      required: ["aum", "founded", "headquarters"],
+      properties: {
+        aum: { type: "string", description: "Firm AUM as stated, empty if not stated" },
+        founded: { type: "string", description: "Year founded, empty if not stated" },
+        headquarters: { type: "string", description: "HQ location, empty if not stated" },
+      },
+    },
+    keyPeople: {
+      type: "array",
+      description: "Key investment professionals and leadership",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["name", "role", "background"],
+        properties: {
+          name: { type: "string" },
+          role: { type: "string" },
+          background: {
+            type: "string",
+            description: "One line: prior firms, tenure, notable facts. Empty if not stated.",
+          },
+        },
+      },
+    },
+    keyTerms: {
+      type: "array",
+      description:
+        "Commercial terms as stated: management fee, performance fee/carry, preferred return, lock-up/liquidity, minimum, fund term, GP commitment, etc.",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["term", "value"],
+        properties: { term: { type: "string" }, value: { type: "string" } },
+      },
+    },
+    deadlines: {
+      type: "array",
+      description: "Known dates: first/final close, subscription cutoffs, launch dates",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["date", "label"],
+        properties: {
+          date: { type: "string", description: "YYYY-MM-DD if determinable, else empty" },
+          label: { type: "string" },
+        },
+      },
+    },
+    trackRecord: {
+      type: "object",
+      additionalProperties: false,
+      required: ["benchmarkName", "returnsSeries", "funds"],
+      properties: {
+        benchmarkName: {
+          type: "string",
+          description: "Benchmark named in the deck's track record, empty if none",
+        },
+        returnsSeries: {
+          type: "array",
+          description:
+            "Periodic net returns exactly as stated in the deck (monthly, quarterly, or annual), oldest first. Empty for private-markets managers.",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["period", "fundPct", "benchmarkPct"],
+            properties: {
+              period: {
+                type: "string",
+                description: "YYYY-MM for monthly/quarterly points, YYYY for annual",
+              },
+              fundPct: { type: "number", description: "Fund net return for the period, percent" },
+              benchmarkPct: {
+                type: ["number", "null"],
+                description: "Benchmark return for the same period if stated",
+              },
+            },
+          },
+        },
+        funds: {
+          type: "array",
+          description:
+            "Prior fund history for private-markets managers, oldest first. Empty for hedge funds.",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["name", "vintage", "sizeMm", "netIrrPct", "dpi", "tvpi", "status"],
+            properties: {
+              name: { type: "string" },
+              vintage: { type: ["number", "null"] },
+              sizeMm: { type: ["number", "null"], description: "Fund size in USD millions" },
+              netIrrPct: { type: ["number", "null"] },
+              dpi: { type: ["number", "null"] },
+              tvpi: { type: ["number", "null"] },
+              status: { type: "string", description: "e.g. Fully realized, Investing, empty" },
+            },
+          },
+        },
+      },
+    },
+    notes: {
+      type: "string",
+      description:
+        "Caveats for the deal team: what was ambiguous, missing, or assumed during extraction",
+    },
+  },
+} as const;
+
+/** Extract a structured manager profile + deal-card draft from pitch deck text. */
+export async function runDeckExtraction(
+  deckText: string,
+  assetClassNames: string[]
+): Promise<DeckProfile> {
+  let text = deckText.trim();
+  if (!text) {
+    throw new Error(
+      "No text could be extracted from this deck — it may be image-only (OCR is not supported yet)"
+    );
+  }
+  let truncated = false;
+  if (text.length > MAX_DOC_CHARS) {
+    text = text.slice(0, MAX_DOC_CHARS);
+    truncated = true;
+  }
+
+  const completion = await azureClient().chat.completions.create({
+    model: AI_MODEL,
+    response_format: {
+      type: "json_schema",
+      json_schema: { name: "deck_profile", strict: true, schema: DECK_SCHEMA },
+    },
+    messages: [
+      {
+        role: "system",
+        content:
+          "You extract structured data from investment manager pitch decks for an " +
+          "institutional allocator's pipeline tool. Only report what the document states — " +
+          "never invent numbers, people, or dates. Track-record figures must be transcribed " +
+          "exactly as printed. Put anything ambiguous in the notes field.",
+      },
+      {
+        role: "user",
+        content:
+          `Our asset class list (choose assetClassName from these, verbatim): ${assetClassNames.join(", ")}.\n` +
+          (truncated ? "NOTE: deck text was truncated; mention this in notes.\n" : "") +
+          `\n--- PITCH DECK TEXT ---\n${text}`,
+      },
+    ],
+  });
+
+  const choice = completion.choices[0];
+  if (choice?.finish_reason === "content_filter") {
+    throw new Error("The extraction was blocked by the Azure OpenAI content filter");
+  }
+  const content = choice?.message?.content;
+  if (!content) throw new Error("The model returned no extraction");
+  return JSON.parse(content) as DeckProfile;
 }

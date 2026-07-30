@@ -1,6 +1,62 @@
 import { PrismaClient } from "@prisma/client";
+import { copyFile, mkdir } from "fs/promises";
+import { execFile } from "child_process";
+import { promisify } from "util";
+import path from "path";
 
 const db = new PrismaClient();
+const execFileAsync = promisify(execFile);
+
+const UPLOAD_ROOT = path.join(process.cwd(), "data", "uploads");
+const ASSETS = path.join(process.cwd(), "seed-assets");
+
+/** Copy a bundled sample file in as a deal document, with best-effort preview. */
+async function seedAsset(opts: {
+  dealId: string;
+  kind: string;
+  src: string;
+  name: string;
+  uploadedById: string;
+}): Promise<string> {
+  const version = 1;
+  const safeName = opts.name.replace(/[^\w.\- ]+/g, "_");
+  const relPath = path.join(opts.dealId, `${opts.kind.toLowerCase()}-v${version}-${safeName}`);
+  const absPath = path.join(UPLOAD_ROOT, relPath);
+  await mkdir(path.dirname(absPath), { recursive: true });
+  await copyFile(path.join(ASSETS, opts.src), absPath);
+
+  let previewPath: string | null = null;
+  if (!absPath.toLowerCase().endsWith(".pdf")) {
+    try {
+      const outDir = path.join(path.dirname(absPath), "previews");
+      await mkdir(outDir, { recursive: true });
+      await execFileAsync(
+        "soffice",
+        ["--headless", "--convert-to", "pdf", "--outdir", outDir, absPath],
+        { timeout: 60_000 }
+      );
+      const produced = path.join(outDir, `${path.basename(absPath, path.extname(absPath))}.pdf`);
+      previewPath = path.relative(UPLOAD_ROOT, produced);
+    } catch {
+      previewPath = null; // soffice unavailable — viewer falls back to download
+    }
+  }
+
+  const doc = await db.document.create({
+    data: {
+      dealId: opts.dealId,
+      kind: opts.kind,
+      version,
+      type: "FILE",
+      name: opts.name,
+      path: relPath,
+      previewPath,
+      uploadedById: opts.uploadedById,
+      note: "Sample document (seeded)",
+    },
+  });
+  return doc.id;
+}
 
 async function main() {
   const assetClassNames = [
@@ -125,6 +181,33 @@ Flag anything else a careful institutional LP would raise, including unusual or 
       create: s,
     });
   }
+
+  await db.benchmark.upsert({
+    where: { name: "Global PE — TVPI quintiles by vintage (illustrative)" },
+    update: {},
+    create: {
+      name: "Global PE — TVPI quintiles by vintage (illustrative)",
+      kind: "PE_QUINTILES",
+      // [q20, q40, q60, q80] boundaries per vintage. Illustrative values —
+      // replace with your benchmark provider's data.
+      data: JSON.stringify(
+        [
+          [2011, 1.35, 1.55, 1.75, 2.05],
+          [2012, 1.35, 1.55, 1.8, 2.1],
+          [2013, 1.32, 1.52, 1.75, 2.05],
+          [2014, 1.3, 1.5, 1.72, 2.02],
+          [2015, 1.28, 1.48, 1.7, 2.0],
+          [2016, 1.26, 1.46, 1.66, 1.95],
+          [2017, 1.24, 1.44, 1.62, 1.9],
+          [2018, 1.22, 1.4, 1.58, 1.85],
+          [2019, 1.18, 1.35, 1.52, 1.75],
+          [2020, 1.12, 1.28, 1.45, 1.65],
+          [2021, 1.05, 1.18, 1.32, 1.5],
+          [2022, 1.0, 1.1, 1.22, 1.38],
+        ].map(([vintage, ...q]) => ({ vintage, q }))
+      ),
+    },
+  });
 
   if ((await db.deal.count()) === 0) {
     const deals = [
@@ -389,6 +472,226 @@ Flag anything else a careful institutional LP would raise, including unusual or 
           },
         });
       }
+    }
+  }
+
+  // Sample files: decks, LPA, sub docs, DDQ — real uploads the demo can open,
+  // preview, AI-review, and profile-extract.
+  const deckDocIds: Record<string, string> = {};
+  if ((await db.document.count({ where: { type: "FILE" } })) === 0) {
+    const byName = async (name: string) =>
+      (await db.deal.findFirst({ where: { managerName: name } }))?.id;
+    const uid = async (name: string) =>
+      (await db.user.findFirst({ where: { name } }))!.id;
+
+    const blackwood = await byName("Blackwood Capital");
+    const meridianId = await byName("Meridian Point");
+    const halcyon = await byName("Halcyon Ridge");
+    const ironbarkId = await byName("Ironbark");
+    const jordan = await uid("Jordan Lee");
+    const sam = await uid("Sam Rivera");
+    const priya = await uid("Priya Shah");
+    const alex = await uid("Alex Kim");
+
+    if (blackwood)
+      await seedAsset({
+        dealId: blackwood,
+        kind: "ONE_PAGER",
+        src: "blackwood-onepager.docx",
+        name: "Blackwood One-Pager.docx",
+        uploadedById: jordan,
+      });
+    if (meridianId)
+      deckDocIds["Meridian Point"] = await seedAsset({
+        dealId: meridianId,
+        kind: "PITCH_DECK",
+        src: "meridian-deck.pdf",
+        name: "Meridian Point — Investor Presentation.pdf",
+        uploadedById: sam,
+      });
+    if (halcyon) {
+      await seedAsset({
+        dealId: halcyon,
+        kind: "LPA",
+        src: "halcyon-lpa.docx",
+        name: "Halcyon Ridge LPA (execution draft).docx",
+        uploadedById: priya,
+      });
+      await seedAsset({
+        dealId: halcyon,
+        kind: "SUB_DOCS",
+        src: "halcyon-subdocs.docx",
+        name: "Halcyon Subscription Agreement.docx",
+        uploadedById: priya,
+      });
+      await seedAsset({
+        dealId: halcyon,
+        kind: "DDQ",
+        src: "halcyon-ddq.docx",
+        name: "Halcyon Ridge DDQ.docx",
+        uploadedById: alex,
+      });
+    }
+    if (ironbarkId)
+      deckDocIds["Ironbark"] = await seedAsset({
+        dealId: ironbarkId,
+        kind: "PITCH_DECK",
+        src: "ironbark-deck.pdf",
+        name: "Ironbark Fund V — Investor Presentation.pdf",
+        uploadedById: sam,
+      });
+  }
+
+  // Demo AI manager profiles so the profile panel and charts show on first run.
+  if ((await db.dealProfile.count()) === 0) {
+    const avery = await db.user.findFirst({ where: { name: "Avery Stone" } });
+    const meridian = await db.deal.findFirst({ where: { managerName: "Meridian Point" } });
+    const ironbark = await db.deal.findFirst({ where: { managerName: "Ironbark" } });
+
+    if (avery && meridian) {
+      // deterministic pseudo-random monthly series, Jan 2019 – Jun 2026
+      let s = 42;
+      const rand = () => {
+        s = (s * 1664525 + 1013904223) % 4294967296;
+        return s / 4294967296;
+      };
+      const gauss = () => {
+        const u = Math.max(rand(), 1e-9);
+        const v = rand();
+        return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+      };
+      const series: { period: string; fundPct: number; benchmarkPct: number }[] = [];
+      for (let i = 0; i < 90; i++) {
+        const yr = 2019 + Math.floor(i / 12);
+        const mo = (i % 12) + 1;
+        const mkt = 0.55 + 4.1 * gauss();
+        const fund = 1.15 + 0.3 * (mkt / 4.1) + 2.1 * gauss();
+        series.push({
+          period: `${yr}-${String(mo).padStart(2, "0")}`,
+          fundPct: Math.round(fund * 100) / 100,
+          benchmarkPct: Math.round(mkt * 100) / 100,
+        });
+      }
+      await db.dealProfile.create({
+        data: {
+          dealId: meridian.id,
+          sourceDocumentId: deckDocIds["Meridian Point"] ?? null,
+          managerType: "HEDGE_FUND",
+          model: "seed-demo",
+          createdById: avery.id,
+          data: JSON.stringify({
+            managerType: "HEDGE_FUND",
+            summary:
+              "Meridian Point runs a global TMT long/short equity strategy with a fundamental, medium-horizon process and disciplined net exposure management. The team of 14 spun out of a large multi-manager platform in 2018. Returns since inception show meaningful alpha over the MSCI World with roughly half the drawdown.",
+            card: {
+              managerName: "Meridian Point",
+              fundName: "Meridian Point Partners LP",
+              assetClassName: "Equity Long/Short",
+              strategy: "Global TMT long/short",
+              targetSizeMm: 50,
+            },
+            firm: { aum: "$2.4bn", founded: "2018", headquarters: "New York, NY" },
+            keyPeople: [
+              {
+                name: "David Okafor",
+                role: "Founder & CIO",
+                background: "Ex-sector head at a large multi-manager platform; 19 yrs in TMT",
+              },
+              {
+                name: "Lena Marsh",
+                role: "Partner, PM — Software",
+                background: "Joined at founding; previously TMT analyst at a global fund",
+              },
+              {
+                name: "Kenji Sato",
+                role: "COO / CCO",
+                background: "Former COO of a $3bn equity manager; CPA",
+              },
+            ],
+            keyTerms: [
+              { term: "Management fee", value: "1.5%" },
+              { term: "Performance fee", value: "17.5%" },
+              { term: "Liquidity", value: "Quarterly, 60 days notice" },
+              { term: "Lock-up", value: "12 months soft (3% fee)" },
+              { term: "Minimum", value: "$5mm" },
+            ],
+            deadlines: [
+              { date: "2026-08-25", label: "September 1 subscription cutoff" },
+              { date: "2026-12-31", label: "Targeted capacity close" },
+            ],
+            trackRecord: {
+              benchmarkName: "MSCI World TR",
+              returnsSeries: series,
+              funds: [],
+            },
+            notes: "Seeded demo profile with synthetic figures for illustration.",
+          }),
+        },
+      });
+    }
+
+    if (avery && ironbark) {
+      await db.dealProfile.create({
+        data: {
+          dealId: ironbark.id,
+          sourceDocumentId: deckDocIds["Ironbark"] ?? null,
+          managerType: "PRIVATE_MARKETS",
+          model: "seed-demo",
+          createdById: avery.id,
+          data: JSON.stringify({
+            managerType: "PRIVATE_MARKETS",
+            summary:
+              "Ironbark acquires infrastructure fund stakes in the secondary market, focusing on core-plus assets in OECD markets. Fund V continues the strategy of Funds I–IV with a larger allocation to GP-led continuation vehicles. Prior funds have consistently landed in the top two quintiles on TVPI.",
+            card: {
+              managerName: "Ironbark",
+              fundName: "Ironbark Real Assets Fund V",
+              assetClassName: "Real Assets",
+              strategy: "Infrastructure secondaries",
+              targetSizeMm: 60,
+            },
+            firm: { aum: "$4.1bn", founded: "2009", headquarters: "London, UK" },
+            keyPeople: [
+              {
+                name: "Margaret Hale",
+                role: "Managing Partner",
+                background: "Co-founded Ironbark; previously infrastructure M&A at a bulge bracket",
+              },
+              {
+                name: "Tomás Rivera",
+                role: "Partner, Head of Secondaries",
+                background: "Led European secondaries at a global alternatives firm",
+              },
+              {
+                name: "Priya Nair",
+                role: "CFO",
+                background: "15 yrs fund finance across PE and infrastructure",
+              },
+            ],
+            keyTerms: [
+              { term: "Management fee", value: "2.0% on committed" },
+              { term: "Carried interest", value: "20% over 8% pref" },
+              { term: "Fund term", value: "10 years + two 1-yr extensions" },
+              { term: "GP commitment", value: "2.5%" },
+              { term: "Target size", value: "$750mm (hard cap $900mm)" },
+            ],
+            deadlines: [
+              { date: "2026-06-30", label: "First close (completed)" },
+              { date: "2026-11-30", label: "Final close" },
+            ],
+            trackRecord: {
+              benchmarkName: "",
+              returnsSeries: [],
+              funds: [
+                { name: "Fund I", vintage: 2012, sizeMm: 210, netIrrPct: 18.9, dpi: 1.92, tvpi: 1.95, status: "Fully realized" },
+                { name: "Fund II", vintage: 2015, sizeMm: 375, netIrrPct: 16.2, dpi: 1.41, tvpi: 1.78, status: "Harvesting" },
+                { name: "Fund III", vintage: 2018, sizeMm: 520, netIrrPct: 14.8, dpi: 0.62, tvpi: 1.52, status: "Harvesting" },
+                { name: "Fund IV", vintage: 2021, sizeMm: 640, netIrrPct: 11.3, dpi: 0.15, tvpi: 1.21, status: "Investing" },
+              ],
+            },
+            notes: "Seeded demo profile with synthetic figures for illustration.",
+          }),
+        },
+      });
     }
   }
 
