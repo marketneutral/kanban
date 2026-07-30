@@ -13,6 +13,7 @@ import { extractDocumentText, TEXT_EXTRACT_EXTS } from "@/lib/extract";
 import { generatePdfPreview } from "@/lib/convert";
 import { saveDocumentFile, MAX_UPLOAD_BYTES } from "@/lib/documents";
 import { UPLOAD_ROOT } from "@/lib/uploads";
+import { guard } from "@/lib/action-guard";
 
 const MANAGER_TYPE_TO_CLASS_HINT: Record<string, string[]> = {
   HEDGE_FUND: ["Multi-Strategy", "Equity Long/Short"],
@@ -67,7 +68,8 @@ async function resolveAssetClassId(name: string, managerType: string): Promise<s
  * ✨ Create a deal card from a pitch deck: extracts the card fields and a full
  * manager profile, creates the deal, and attaches the deck as a document.
  */
-export async function createDealFromDeck(formData: FormData) {
+export const createDealFromDeck = guard(createDealFromDeckBody);
+async function createDealFromDeckBody(formData: FormData) {
   const user = await requireUserAction();
   if (!canManageDeals(user)) throw new Error("Not permitted");
 
@@ -141,7 +143,8 @@ export async function createDealFromDeck(formData: FormData) {
 }
 
 /** Re-run profile extraction from a deck already attached to a deal. */
-export async function buildProfileFromDocument(formData: FormData) {
+export const buildProfileFromDocument = guard(buildProfileFromDocumentBody);
+async function buildProfileFromDocumentBody(formData: FormData) {
   const user = await requireUserAction();
   if (!canManageDeals(user)) throw new Error("Not permitted");
   if (!aiConfigured()) throw new Error("AI is not configured on the server");

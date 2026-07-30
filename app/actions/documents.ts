@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { requireUserAction } from "@/lib/session";
 import { canManageDeals, hasRole, isAdmin, DOC_KINDS, type DocKind } from "@/lib/types";
 import { saveDocumentFile } from "@/lib/documents";
+import { guard } from "@/lib/action-guard";
 
 const OPS_KINDS: DocKind[] = ["DDQ", "ODD_REPORT"];
 const LEGAL_KINDS: DocKind[] = ["LPA", "SUB_DOCS"];
@@ -16,7 +17,8 @@ function canUploadKind(user: { roles: { role: string }[] }, kind: DocKind): bool
   return canManageDeals(user);
 }
 
-export async function addDocument(formData: FormData) {
+export const addDocument = guard(addDocumentBody);
+async function addDocumentBody(formData: FormData) {
   const user = await requireUserAction();
   const dealId = String(formData.get("dealId") ?? "");
   const kind = String(formData.get("kind") ?? "") as DocKind;

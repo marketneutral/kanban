@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import Link from "next/link";
 import "./globals.css";
+import ActionErrorBanner from "@/components/ActionErrorBanner";
 import { getCurrentUser } from "@/lib/session";
 import { signOut } from "@/app/actions/auth";
 import { isAdmin, ROLE_LABELS, type Role } from "@/lib/types";
@@ -71,7 +73,12 @@ export default async function RootLayout({
             </div>
           </div>
         </header>
-        <main className="flex-1">{children}</main>
+        <main className="flex-1">
+          <Suspense>
+            <ActionErrorBanner />
+          </Suspense>
+          {children}
+        </main>
       </body>
     </html>
   );

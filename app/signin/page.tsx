@@ -10,11 +10,11 @@ export const dynamic = "force-dynamic";
 export default async function SignInPage({
   searchParams,
 }: {
-  searchParams: Promise<{ taken?: string }>;
+  searchParams: Promise<{ taken?: string; expired?: string }>;
 }) {
   const current = await getCurrentUser();
   if (current) redirect("/board");
-  const { taken } = await searchParams;
+  const { taken, expired } = await searchParams;
 
   const [users, signedIn] = await Promise.all([
     db.user.findMany({
@@ -39,6 +39,11 @@ export default async function SignInPage({
         <p className="mt-4 w-full rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-center text-[13px] text-amber-800">
           That user is already signed in elsewhere. Their seat frees when they sign out or
           after 30 minutes idle.
+        </p>
+      )}
+      {expired && (
+        <p className="mt-4 w-full rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-center text-[13px] text-amber-800">
+          Your session expired after 30 minutes of inactivity — sign in again to continue.
         </p>
       )}
 

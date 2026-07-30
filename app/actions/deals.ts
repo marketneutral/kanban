@@ -19,6 +19,7 @@ import {
   seedChecklists,
   unmetSummary,
 } from "@/lib/workflow";
+import { guard } from "@/lib/action-guard";
 
 async function requireDealManager() {
   const user = await requireUserAction();
@@ -55,7 +56,8 @@ function teamIds(formData: FormData): string[] {
   return formData.getAll("teamIds").map(String).filter(Boolean);
 }
 
-export async function createDeal(formData: FormData) {
+export const createDeal = guard(createDealBody);
+async function createDealBody(formData: FormData) {
   const user = await requireDealManager();
   const fields = dealFields(formData);
   const deal = await db.deal.create({
@@ -73,7 +75,8 @@ export async function createDeal(formData: FormData) {
   redirect(`/deals/${deal.id}`);
 }
 
-export async function updateDeal(formData: FormData) {
+export const updateDeal = guard(updateDealBody);
+async function updateDealBody(formData: FormData) {
   const user = await requireDealManager();
   const dealId = String(formData.get("dealId") ?? "");
   const fields = dealFields(formData);
@@ -102,7 +105,8 @@ export async function updateDeal(formData: FormData) {
  * evaluation the UI renders — so a card's column always means what it says.
  * Send-backs are ungated but audited.
  */
-export async function moveStage(formData: FormData) {
+export const moveStage = guard(moveStageBody);
+async function moveStageBody(formData: FormData) {
   const user = await requireDealManager();
   const dealId = String(formData.get("dealId") ?? "");
   const direction = String(formData.get("direction") ?? "");
@@ -149,7 +153,8 @@ export async function moveStage(formData: FormData) {
   revalidatePath(`/deals/${dealId}`);
 }
 
-export async function setDealStatus(formData: FormData) {
+export const setDealStatus = guard(setDealStatusBody);
+async function setDealStatusBody(formData: FormData) {
   const user = await requireDealManager();
   const dealId = String(formData.get("dealId") ?? "");
   let status = String(formData.get("status") ?? "");
@@ -184,7 +189,8 @@ export async function setDealStatus(formData: FormData) {
 }
 
 /** Ops or the CFO (or admin) marks the approved allocation wired: closed and funded. */
-export async function markFunded(formData: FormData) {
+export const markFunded = guard(markFundedBody);
+async function markFundedBody(formData: FormData) {
   const user = await requireUserAction();
   if (!hasRole(user, "OPS", "CFO", "ADMIN")) {
     throw new Error("Only Ops or the CFO can mark a deal funded");
@@ -213,7 +219,8 @@ export async function markFunded(formData: FormData) {
 }
 
 /** Admin-only undo for a mistaken funding mark. */
-export async function revertFunded(formData: FormData) {
+export const revertFunded = guard(revertFundedBody);
+async function revertFundedBody(formData: FormData) {
   const user = await requireUserAction();
   if (!hasRole(user, "ADMIN")) throw new Error("Admin only");
   const dealId = String(formData.get("dealId") ?? "");

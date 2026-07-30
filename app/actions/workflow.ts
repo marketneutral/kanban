@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { requireUserAction } from "@/lib/session";
 import { canManageDeals, hasRole, isAdmin } from "@/lib/types";
 import { isMonday, todayUtc } from "@/lib/meetings";
+import { guard } from "@/lib/action-guard";
 
 function touch(dealId: string) {
   revalidatePath("/board");
@@ -13,7 +14,8 @@ function touch(dealId: string) {
 
 // ---------------------------------------------------------------- follow-ups
 
-export async function addFollowUp(formData: FormData) {
+export const addFollowUp = guard(addFollowUpBody);
+async function addFollowUpBody(formData: FormData) {
   const user = await requireUserAction();
   const dealId = String(formData.get("dealId") ?? "");
   const title = String(formData.get("title") ?? "").trim();
@@ -36,7 +38,8 @@ export async function addFollowUp(formData: FormData) {
   touch(dealId);
 }
 
-export async function resolveFollowUp(formData: FormData) {
+export const resolveFollowUp = guard(resolveFollowUpBody);
+async function resolveFollowUpBody(formData: FormData) {
   const user = await requireUserAction();
   const id = String(formData.get("id") ?? "");
   const fu = await db.followUp.update({
@@ -54,7 +57,8 @@ export async function resolveFollowUp(formData: FormData) {
   touch(fu.dealId);
 }
 
-export async function waiveFollowUp(formData: FormData) {
+export const waiveFollowUp = guard(waiveFollowUpBody);
+async function waiveFollowUpBody(formData: FormData) {
   const user = await requireUserAction();
   const id = String(formData.get("id") ?? "");
   const note = String(formData.get("note") ?? "").trim();
@@ -79,7 +83,8 @@ export async function waiveFollowUp(formData: FormData) {
   touch(fu.dealId);
 }
 
-export async function reopenFollowUp(formData: FormData) {
+export const reopenFollowUp = guard(reopenFollowUpBody);
+async function reopenFollowUpBody(formData: FormData) {
   const user = await requireUserAction();
   const id = String(formData.get("id") ?? "");
   const fu = await db.followUp.findUniqueOrThrow({ where: { id }, include: { deal: true } });
@@ -103,7 +108,8 @@ export async function reopenFollowUp(formData: FormData) {
 
 // ------------------------------------------------------------- presentations
 
-export async function recordPresentation(formData: FormData) {
+export const recordPresentation = guard(recordPresentationBody);
+async function recordPresentationBody(formData: FormData) {
   const user = await requireUserAction();
   if (!canManageDeals(user)) throw new Error("Not permitted");
   const dealId = String(formData.get("dealId") ?? "");
@@ -131,7 +137,8 @@ export async function recordPresentation(formData: FormData) {
 
 // ------------------------------------------------------------- IC meetings
 
-export async function scheduleForIC(formData: FormData) {
+export const scheduleForIC = guard(scheduleForICBody);
+async function scheduleForICBody(formData: FormData) {
   const user = await requireUserAction();
   if (!canManageDeals(user)) throw new Error("Not permitted");
   const dealId = String(formData.get("dealId") ?? "");
@@ -159,7 +166,8 @@ export async function scheduleForIC(formData: FormData) {
   touch(dealId);
 }
 
-export async function unscheduleFromIC(formData: FormData) {
+export const unscheduleFromIC = guard(unscheduleFromICBody);
+async function unscheduleFromICBody(formData: FormData) {
   const user = await requireUserAction();
   if (!canManageDeals(user)) throw new Error("Not permitted");
   const dealId = String(formData.get("dealId") ?? "");
@@ -176,7 +184,8 @@ export async function unscheduleFromIC(formData: FormData) {
 
 // ------------------------------------------------- ODD / Legal checklists
 
-export async function toggleChecklistItem(formData: FormData) {
+export const toggleChecklistItem = guard(toggleChecklistItemBody);
+async function toggleChecklistItemBody(formData: FormData) {
   const user = await requireUserAction();
   const id = String(formData.get("id") ?? "");
   const item = await db.checklistItem.findUniqueOrThrow({ where: { id } });
@@ -214,7 +223,8 @@ export async function toggleChecklistItem(formData: FormData) {
   touch(item.dealId);
 }
 
-export async function markOddComplete(formData: FormData) {
+export const markOddComplete = guard(markOddCompleteBody);
+async function markOddCompleteBody(formData: FormData) {
   const user = await requireUserAction();
   if (!hasRole(user, "OPS") && !isAdmin(user)) throw new Error("Only Ops can sign off ODD");
   const dealId = String(formData.get("dealId") ?? "");

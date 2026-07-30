@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireUserAction } from "@/lib/session";
 import { isAdmin, ROLES, type Role } from "@/lib/types";
+import { guard } from "@/lib/action-guard";
 
 async function requireAdmin() {
   const user = await requireUserAction();
@@ -11,7 +12,8 @@ async function requireAdmin() {
   return user;
 }
 
-export async function createUser(formData: FormData) {
+export const createUser = guard(createUserBody);
+async function createUserBody(formData: FormData) {
   await requireAdmin();
   const name = String(formData.get("name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
@@ -24,7 +26,8 @@ export async function createUser(formData: FormData) {
   revalidatePath("/admin");
 }
 
-export async function toggleUserActive(formData: FormData) {
+export const toggleUserActive = guard(toggleUserActiveBody);
+async function toggleUserActiveBody(formData: FormData) {
   const admin = await requireAdmin();
   const userId = String(formData.get("userId") ?? "");
   if (userId === admin.id) throw new Error("You cannot deactivate yourself");
@@ -33,7 +36,8 @@ export async function toggleUserActive(formData: FormData) {
   revalidatePath("/admin");
 }
 
-export async function toggleUserRole(formData: FormData) {
+export const toggleUserRole = guard(toggleUserRoleBody);
+async function toggleUserRoleBody(formData: FormData) {
   const admin = await requireAdmin();
   const userId = String(formData.get("userId") ?? "");
   const role = String(formData.get("role") ?? "");
@@ -54,7 +58,8 @@ export async function toggleUserRole(formData: FormData) {
 }
 
 /** Free a user's seat (e.g. their browser crashed and the session is locked). */
-export async function forceSignOut(formData: FormData) {
+export const forceSignOut = guard(forceSignOutBody);
+async function forceSignOutBody(formData: FormData) {
   await requireAdmin();
   const userId = String(formData.get("userId") ?? "");
   await db.session.deleteMany({ where: { userId } });
@@ -62,7 +67,8 @@ export async function forceSignOut(formData: FormData) {
   revalidatePath("/signin");
 }
 
-export async function createAssetClass(formData: FormData) {
+export const createAssetClass = guard(createAssetClassBody);
+async function createAssetClassBody(formData: FormData) {
   await requireAdmin();
   const name = String(formData.get("name") ?? "").trim();
   if (!name) throw new Error("Name is required");
@@ -70,7 +76,8 @@ export async function createAssetClass(formData: FormData) {
   revalidatePath("/admin");
 }
 
-export async function toggleAssetClassMarket(formData: FormData) {
+export const toggleAssetClassMarket = guard(toggleAssetClassMarketBody);
+async function toggleAssetClassMarketBody(formData: FormData) {
   await requireAdmin();
   const id = String(formData.get("id") ?? "");
   const ac = await db.assetClass.findUniqueOrThrow({ where: { id } });
@@ -82,7 +89,8 @@ export async function toggleAssetClassMarket(formData: FormData) {
   revalidatePath("/reports");
 }
 
-export async function deleteAssetClass(formData: FormData) {
+export const deleteAssetClass = guard(deleteAssetClassBody);
+async function deleteAssetClassBody(formData: FormData) {
   await requireAdmin();
   const id = String(formData.get("id") ?? "");
   const inUse = await db.deal.count({ where: { assetClassId: id } });

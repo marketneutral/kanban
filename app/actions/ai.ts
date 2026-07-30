@@ -5,8 +5,10 @@ import { db } from "@/lib/db";
 import { requireUserAction } from "@/lib/session";
 import { canManageDeals, hasRole, isAdmin } from "@/lib/types";
 import { aiConfigured, runDocumentReview, runDevilsAdvocate, AI_MODEL } from "@/lib/ai";
+import { guard } from "@/lib/action-guard";
 
-export async function requestDocumentReview(formData: FormData) {
+export const requestDocumentReview = guard(requestDocumentReviewBody);
+async function requestDocumentReviewBody(formData: FormData) {
   const user = await requireUserAction();
   if (!(canManageDeals(user) || hasRole(user, "LEGAL", "OPS"))) {
     throw new Error("Not permitted");
@@ -63,7 +65,8 @@ export async function requestDocumentReview(formData: FormData) {
   revalidatePath(`/deals/${doc.dealId}`);
 }
 
-export async function requestDevilsAdvocate(formData: FormData) {
+export const requestDevilsAdvocate = guard(requestDevilsAdvocateBody);
+async function requestDevilsAdvocateBody(formData: FormData) {
   const user = await requireUserAction();
   if (!(canManageDeals(user) || hasRole(user, "LEGAL", "OPS"))) {
     throw new Error("Not permitted");
@@ -125,7 +128,8 @@ export async function requestDevilsAdvocate(formData: FormData) {
   revalidatePath(`/deals/${doc.dealId}`);
 }
 
-export async function updateReviewStandard(formData: FormData) {
+export const updateReviewStandard = guard(updateReviewStandardBody);
+async function updateReviewStandardBody(formData: FormData) {
   const user = await requireUserAction();
   if (!isAdmin(user)) throw new Error("Admin only");
   const id = String(formData.get("id") ?? "");

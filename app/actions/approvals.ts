@@ -5,11 +5,13 @@ import { db } from "@/lib/db";
 import { requireUserAction } from "@/lib/session";
 import { hasRole, ROLE_LABELS, APPROVAL_STEPS, type ApprovalStep } from "@/lib/types";
 import { evaluateChain, gateInclude, mdRoleFor, resetApprovals } from "@/lib/workflow";
+import { guard } from "@/lib/action-guard";
 
 // Each chain step requires the signature of a specific role (the MD step routes
 // by the deal's market type). Admins deliberately cannot approve — sign-off
 // authority is the product.
-export async function decideApproval(formData: FormData) {
+export const decideApproval = guard(decideApprovalBody);
+async function decideApprovalBody(formData: FormData) {
   const user = await requireUserAction();
   const dealId = String(formData.get("dealId") ?? "");
   const step = String(formData.get("step") ?? "") as ApprovalStep;
