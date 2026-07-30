@@ -25,9 +25,12 @@ async function main() {
 
   const n = Math.max(1, Math.min(2000, parseInt(arg ?? "150", 10) || 150));
   const classes = await db.assetClass.findMany();
-  // only deal-team members lead deals — MDs and executives sign, not source
+  // anyone working deals can lead or join one: Investors and MDs
   const leads = await db.user.findMany({
-    where: { active: true, roles: { some: { role: "DEAL_TEAM" } } },
+    where: {
+      active: true,
+      roles: { some: { role: { in: ["DEAL_TEAM", "MD_PUBLIC", "MD_PRIVATE"] } } },
+    },
   });
   if (classes.length === 0 || leads.length === 0) {
     throw new Error("Seed the database first (npm run db:seed)");
