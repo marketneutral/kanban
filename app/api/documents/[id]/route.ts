@@ -7,7 +7,18 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { UPLOAD_ROOT } from "@/lib/uploads";
 
-export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+// Types we let the browser render inline; everything else downloads.
+// (SVG is deliberately excluded — inline user-uploaded SVG can run scripts.)
+const INLINE_TYPES: Record<string, string> = {
+  ".pdf": "application/pdf",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
+};
+
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) redirect("/signin");
 
@@ -27,12 +38,18 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     notFound();
   }
 
+  const forceDownload = new URL(req.url).searchParams.has("dl");
+  const inlineType = INLINE_TYPES[path.extname(doc.name).toLowerCase()];
+  const disposition = !forceDownload && inlineType ? "inline" : "attachment";
+  const contentType = inlineType ?? "application/octet-stream";
+
   const stream = Readable.toWeb(createReadStream(abs)) as ReadableStream;
   return new Response(stream, {
     headers: {
       "content-length": String(size),
-      "content-disposition": `attachment; filename="${encodeURIComponent(doc.name)}"`,
-      "content-type": "application/octet-stream",
+      "content-disposition": `${disposition}; filename="${encodeURIComponent(doc.name)}"`,
+      "content-type": contentType,
+      "x-content-type-options": "nosniff",
     },
   });
 }

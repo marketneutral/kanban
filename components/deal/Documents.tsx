@@ -57,7 +57,7 @@ export default function Documents({
                     v{d.version}
                   </span>
                   <a
-                    href={`/api/documents/${d.id}`}
+                    href={d.type === "LINK" ? `/api/documents/${d.id}` : `/documents/${d.id}`}
                     target={d.type === "LINK" ? "_blank" : undefined}
                     className="min-w-0 flex-1 truncate font-medium text-accent-700 hover:underline"
                   >
@@ -67,6 +67,15 @@ export default function Documents({
                   <span className="shrink-0 text-[11px] text-stone-400">
                     {d.uploadedBy.name} · {fmtDate(d.createdAt)}
                   </span>
+                  {d.type === "FILE" && (
+                    <a
+                      href={`/api/documents/${d.id}?dl=1`}
+                      title="Download"
+                      className="shrink-0 rounded px-1 text-stone-300 hover:bg-stone-100 hover:text-stone-600"
+                    >
+                      ↓
+                    </a>
+                  )}
                 </li>
               ))}
             </ul>
