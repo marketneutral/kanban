@@ -1,0 +1,154 @@
+import { redirect } from "next/navigation";
+import { db } from "@/lib/db";
+import { requireUser } from "@/lib/session";
+import { isAdmin, ROLES, ROLE_LABELS, type Role } from "@/lib/types";
+import {
+  createUser,
+  toggleUserActive,
+  toggleUserRole,
+  createAssetClass,
+  deleteAssetClass,
+} from "@/app/actions/admin";
+
+export const dynamic = "force-dynamic";
+
+const inputCls =
+  "rounded-md border border-stone-200 bg-white px-3 py-1.5 text-[13px] shadow-sm placeholder:text-stone-400 focus:border-accent-400 focus:outline-none";
+
+export default async function AdminPage() {
+  const user = await requireUser();
+  if (!isAdmin(user)) redirect("/board");
+
+  const [users, assetClasses] = await Promise.all([
+    db.user.findMany({
+      include: { roles: true, _count: { select: { ledDeals: true } } },
+      orderBy: { name: "asc" },
+    }),
+    db.assetClass.findMany({
+      include: { _count: { select: { deals: true } } },
+      orderBy: { name: "asc" },
+    }),
+  ]);
+
+  return (
+    <div className="mx-auto max-w-5xl px-5 py-8">
+      <h1 className="text-lg font-semibold tracking-tight text-stone-900">Admin</h1>
+      <p className="text-[13px] text-stone-500">Users, roles and asset classes.</p>
+
+      {/* Users */}
+      <section className="mt-6 rounded-xl border border-stone-200 bg-white shadow-sm">
+        <header className="border-b border-stone-100 px-5 py-3">
+          <h2 className="text-sm font-semibold text-stone-900">Users</h2>
+          <p className="text-xs text-stone-500">
+            Click a role chip to grant or remove it. Deactivated users cannot sign in but keep
+            their history.
+          </p>
+        </header>
+        <div className="divide-y divide-stone-100">
+          {users.map((u) => {
+            const has = new Set(u.roles.map((r) => r.role));
+            return (
+              <div key={u.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
+                <div className="min-w-[180px]">
+                  <div className={`text-sm font-medium ${u.active ? "text-stone-900" : "text-stone-400 line-through"}`}>
+                    {u.name}
+                  </div>
+                  <div className="text-xs text-stone-400">{u.email}</div>
+                </div>
+                <div className="flex flex-1 flex-wrap gap-1.5">
+                  {ROLES.map((role) => {
+                    const on = has.has(role);
+                    return (
+                      <form key={role} action={toggleUserRole}>
+                        <input type="hidden" name="userId" value={u.id} />
+                        <input type="hidden" name="role" value={role} />
+                        <button
+                          type="submit"
+                          title={on ? `Remove ${ROLE_LABELS[role]}` : `Grant ${ROLE_LABELS[role]}`}
+                          className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition ${
+                            on
+                              ? "bg-accent-700 text-white"
+                              : "bg-stone-100 text-stone-400 hover:bg-stone-200 hover:text-stone-600"
+                          }`}
+                        >
+                          {ROLE_LABELS[role]}
+                        </button>
+                      </form>
+                    );
+                  })}
+                </div>
+                <form action={toggleUserActive}>
+                  <input type="hidden" name="userId" value={u.id} />
+                  <button
+                    type="submit"
+                    disabled={u.id === user.id}
+                    className="rounded-md px-2.5 py-1 text-[12px] text-stone-500 hover:bg-stone-100 disabled:opacity-30"
+                  >
+                    {u.active ? "Deactivate" : "Reactivate"}
+                  </button>
+                </form>
+              </div>
+            );
+          })}
+        </div>
+        <form action={createUser} className="flex flex-wrap items-center gap-2 border-t border-stone-100 bg-stone-50 px-5 py-3">
+          <input name="name" required placeholder="Full name" className={inputCls} />
+          <input name="email" required type="email" placeholder="Email" className={inputCls} />
+          <div className="flex flex-wrap gap-1.5">
+            {ROLES.map((role) => (
+              <label
+                key={role}
+                className="flex cursor-pointer items-center gap-1 rounded-full bg-stone-100 px-2.5 py-1 text-[11px] font-medium text-stone-500 has-checked:bg-accent-700 has-checked:text-white"
+              >
+                <input type="checkbox" name="roles" value={role} className="sr-only" />
+                {ROLE_LABELS[role]}
+              </label>
+            ))}
+          </div>
+          <button className="rounded-md bg-accent-700 px-3 py-1.5 text-[13px] font-medium text-white shadow-sm hover:bg-accent-800">
+            Add user
+          </button>
+        </form>
+      </section>
+
+      {/* Asset classes */}
+      <section className="mt-6 rounded-xl border border-stone-200 bg-white shadow-sm">
+        <header className="border-b border-stone-100 px-5 py-3">
+          <h2 className="text-sm font-semibold text-stone-900">Asset classes</h2>
+          <p className="text-xs text-stone-500">
+            Used on deal cards and in reports. Classes in use by deals cannot be removed.
+          </p>
+        </header>
+        <div className="flex flex-wrap gap-2 px-5 py-4">
+          {assetClasses.map((a) => (
+            <span
+              key={a.id}
+              className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white px-3 py-1.5 text-[13px] text-stone-700 shadow-sm"
+            >
+              {a.name}
+              <span className="text-[11px] text-stone-400">{a._count.deals}</span>
+              {a._count.deals === 0 && (
+                <form action={deleteAssetClass}>
+                  <input type="hidden" name="id" value={a.id} />
+                  <button
+                    type="submit"
+                    title="Remove asset class"
+                    className="text-stone-300 hover:text-red-500"
+                  >
+                    ×
+                  </button>
+                </form>
+              )}
+            </span>
+          ))}
+        </div>
+        <form action={createAssetClass} className="flex items-center gap-2 border-t border-stone-100 bg-stone-50 px-5 py-3">
+          <input name="name" required placeholder="New asset class" className={inputCls} />
+          <button className="rounded-md bg-accent-700 px-3 py-1.5 text-[13px] font-medium text-white shadow-sm hover:bg-accent-800">
+            Add
+          </button>
+        </form>
+      </section>
+    </div>
+  );
+}

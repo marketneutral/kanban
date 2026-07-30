@@ -1,0 +1,28 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  /* Accent: deep teal — the single accent color of the app */
+  --color-accent-50: #f0f7f7;
+  --color-accent-100: #d8ebeb;
+  --color-accent-200: #b2d7d7;
+  --color-accent-300: #7fbaba;
+  --color-accent-400: #4d9899;
+  --color-accent-500: #337d7e;
+  --color-accent-600: #276365;
+  --color-accent-700: #225153;
+  --color-accent-800: #1f4243;
+  --color-accent-900: #1c3839;
+  --color-accent-950: #0b1f20;
+}
+
+body {
+  background: var(--color-stone-100);
+  color: var(--color-stone-800);
+}
+
+::selection {
+  background: var(--color-accent-200);
+}
