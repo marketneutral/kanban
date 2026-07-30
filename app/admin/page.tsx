@@ -6,10 +6,12 @@ import {
   createUser,
   toggleUserActive,
   toggleUserRole,
+  forceSignOut,
   createAssetClass,
   deleteAssetClass,
   toggleAssetClassMarket,
 } from "@/app/actions/admin";
+import { activeSessionUserIds } from "@/lib/session";
 import { updateReviewStandard } from "@/app/actions/ai";
 import { aiConfigured, AI_MODEL } from "@/lib/ai";
 
@@ -22,7 +24,7 @@ export default async function AdminPage() {
   const user = await requireUser();
   if (!isAdmin(user)) redirect("/board");
 
-  const [users, assetClasses, standards] = await Promise.all([
+  const [users, assetClasses, standards, signedIn] = await Promise.all([
     db.user.findMany({
       include: { roles: true, _count: { select: { ledDeals: true } } },
       orderBy: { name: "asc" },
@@ -32,6 +34,7 @@ export default async function AdminPage() {
       orderBy: { name: "asc" },
     }),
     db.reviewStandard.findMany({ orderBy: [{ mode: "asc" }, { kind: "asc" }] }),
+    activeSessionUserIds(),
   ]);
 
   return (
@@ -54,8 +57,14 @@ export default async function AdminPage() {
             return (
               <div key={u.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
                 <div className="min-w-[180px]">
-                  <div className={`text-sm font-medium ${u.active ? "text-stone-900" : "text-stone-400 line-through"}`}>
+                  <div className={`flex items-center gap-1.5 text-sm font-medium ${u.active ? "text-stone-900" : "text-stone-400 line-through"}`}>
                     {u.name}
+                    {signedIn.has(u.id) && (
+                      <span
+                        title="Currently signed in"
+                        className="h-2 w-2 shrink-0 rounded-full bg-emerald-500"
+                      />
+                    )}
                   </div>
                   <div className="text-xs text-stone-400">{u.email}</div>
                 </div>
@@ -81,6 +90,18 @@ export default async function AdminPage() {
                     );
                   })}
                 </div>
+                {signedIn.has(u.id) && u.id !== user.id && (
+                  <form action={forceSignOut}>
+                    <input type="hidden" name="userId" value={u.id} />
+                    <button
+                      type="submit"
+                      title="Free this user's seat — their browser will be signed out"
+                      className="rounded-md px-2.5 py-1 text-[12px] text-amber-700 hover:bg-amber-50"
+                    >
+                      Force sign-out
+                    </button>
+                  </form>
+                )}
                 <form action={toggleUserActive}>
                   <input type="hidden" name="userId" value={u.id} />
                   <button

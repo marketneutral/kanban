@@ -53,6 +53,15 @@ export async function toggleUserRole(formData: FormData) {
   revalidatePath("/admin");
 }
 
+/** Free a user's seat (e.g. their browser crashed and the session is locked). */
+export async function forceSignOut(formData: FormData) {
+  await requireAdmin();
+  const userId = String(formData.get("userId") ?? "");
+  await db.session.deleteMany({ where: { userId } });
+  revalidatePath("/admin");
+  revalidatePath("/signin");
+}
+
 export async function createAssetClass(formData: FormData) {
   await requireAdmin();
   const name = String(formData.get("name") ?? "").trim();

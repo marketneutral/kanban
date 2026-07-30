@@ -28,8 +28,10 @@ npm run dev -- -p 8642    # …or any other port, if 3000 is taken
 ```
 
 Sign in from the roster (v1 is passwordless, for a trusted network — every action is
-attributed to the selected user in the audit trail). The seeded **Avery Stone** holds the
-Admin role for managing users, roles and asset classes at `/admin`.
+attributed to the selected user in the audit trail). **One sign-in per user at a time**:
+a user who is signed in shows grayed out on the roster until they sign out, go idle for
+30 minutes, or an admin frees the seat with Force sign-out. The seeded **Avery Stone**
+holds the Admin role for managing users, roles and asset classes at `/admin`.
 
 ## Running with Docker
 

@@ -28,8 +28,19 @@ model User {
   oddCompleted  Deal[]               @relation("OddCompletedBy")
   documentReviews DocumentReview[]
   dealProfiles  DealProfile[]
+  session       Session?
 
   createdAt DateTime @default(now())
+}
+
+// One row = one signed-in browser. userId is unique: a single seat per user,
+// pre-auth. A session goes stale after 30 min idle (see lib/session.ts).
+model Session {
+  token      String   @id // random 32-byte hex, held in the cookie
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String   @unique
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
 }
 
 model UserRole {
