@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireUserAction } from "@/lib/session";
 import { canManageDeals, hasRole, isAdmin } from "@/lib/types";
-import { aiConfigured, runDocumentReview, AI_MODEL } from "@/lib/ai";
+import { aiConfigured, runDocumentReview, runDevilsAdvocate, AI_MODEL } from "@/lib/ai";
 
 export async function requestDocumentReview(formData: FormData) {
   const user = await requireUserAction();
@@ -63,12 +63,74 @@ export async function requestDocumentReview(formData: FormData) {
   revalidatePath(`/deals/${doc.dealId}`);
 }
 
+export async function requestDevilsAdvocate(formData: FormData) {
+  const user = await requireUserAction();
+  if (!(canManageDeals(user) || hasRole(user, "LEGAL", "OPS"))) {
+    throw new Error("Not permitted");
+  }
+  if (!aiConfigured()) {
+    throw new Error(
+      "AI is not configured — set the AZURE_OPENAI_* environment variables on the server"
+    );
+  }
+
+  const documentId = String(formData.get("documentId") ?? "");
+  const doc = await db.document.findUniqueOrThrow({ where: { id: documentId } });
+
+  try {
+    const result = await runDevilsAdvocate(documentId);
+    await db.documentReview.create({
+      data: {
+        documentId,
+        dealId: doc.dealId,
+        mode: "DEVILS_ADVOCATE",
+        model: AI_MODEL,
+        status: "COMPLETE",
+        assessment: result.verdict,
+        summary: result.bearCase,
+        findings: JSON.stringify({
+          rebuttals: result.rebuttals,
+          keyQuestions: result.keyQuestions,
+        }),
+        requestedById: user.id,
+      },
+    });
+    await db.stageEvent.create({
+      data: {
+        dealId: doc.dealId,
+        actorId: user.id,
+        action: "AI_DEVILS_ADVOCATE_RUN",
+        detail: JSON.stringify({
+          kind: doc.kind,
+          name: doc.name,
+          verdict: result.verdict,
+          rebuttals: result.rebuttals.length,
+        }),
+      },
+    });
+  } catch (e) {
+    await db.documentReview.create({
+      data: {
+        documentId,
+        dealId: doc.dealId,
+        mode: "DEVILS_ADVOCATE",
+        model: AI_MODEL,
+        status: "FAILED",
+        error: e instanceof Error ? e.message : "Analysis failed",
+        requestedById: user.id,
+      },
+    });
+  }
+
+  revalidatePath(`/deals/${doc.dealId}`);
+}
+
 export async function updateReviewStandard(formData: FormData) {
   const user = await requireUserAction();
   if (!isAdmin(user)) throw new Error("Admin only");
-  const kind = String(formData.get("kind") ?? "");
+  const id = String(formData.get("id") ?? "");
   const prompt = String(formData.get("prompt") ?? "").trim();
   if (!prompt) throw new Error("The standard cannot be empty");
-  await db.reviewStandard.update({ where: { kind }, data: { prompt } });
+  await db.reviewStandard.update({ where: { id }, data: { prompt } });
   revalidatePath("/admin");
 }

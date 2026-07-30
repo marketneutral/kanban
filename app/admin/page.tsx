@@ -30,7 +30,7 @@ export default async function AdminPage() {
       include: { _count: { select: { deals: true } } },
       orderBy: { name: "asc" },
     }),
-    db.reviewStandard.findMany({ orderBy: { kind: "asc" } }),
+    db.reviewStandard.findMany({ orderBy: [{ mode: "asc" }, { kind: "asc" }] }),
   ]);
 
   return (
@@ -177,9 +177,10 @@ export default async function AdminPage() {
         <div className="divide-y divide-stone-100">
           {standards.map((s) => (
             <form key={s.id} action={updateReviewStandard} className="px-5 py-4">
-              <input type="hidden" name="kind" value={s.kind} />
+              <input type="hidden" name="id" value={s.id} />
               <div className="flex items-center justify-between">
                 <h3 className="text-[13px] font-semibold text-stone-800">
+                  {s.mode === "DEVILS_ADVOCATE" ? "😈 " : ""}
                   {s.title}{" "}
                   <span className="font-mono text-[11px] font-normal text-stone-400">
                     ({s.kind})

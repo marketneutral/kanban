@@ -86,6 +86,16 @@ Without these the feature simply stays hidden. Reviews are audited like every ot
 action. Scanned (image-only) documents aren't supported yet — extraction requires a
 text layer.
 
+## 😈 Devil's Advocate
+
+On any uploaded one-pager, five-pager, or investment proposal, run a **Devil's Advocate**
+analysis: an adversarial rebuttal against the committee's own rubrics (admin-editable at
+`/admin`, seeded with rubrics per document kind). The result is a verdict (*well
+supported / needs stronger evidence / thesis at risk*), the strongest honest bear case,
+claim-by-claim rebuttals with severity and the evidence that would settle each, and the
+hardest questions to ask the presenting team. Designed to pressure-test ideas before
+they reach the IC — the deal team sees the attack before the committee does.
+
 ## ✨ Deal-card autofill from a pitch deck
 
 On **New deal**, upload the manager's deck (PDF, docx, pptx…) and the app creates the

@@ -102,7 +102,9 @@ export async function runDocumentReview(documentId: string): Promise<ReviewResul
     where: { id: documentId },
     include: { deal: { include: { assetClass: true } } },
   });
-  const standard = await db.reviewStandard.findUnique({ where: { kind: doc.kind } });
+  const standard = await db.reviewStandard.findUnique({
+    where: { kind_mode: { kind: doc.kind, mode: "STANDARDS" } },
+  });
   if (!standard) throw new Error("No review standard is configured for this document kind");
 
   if (doc.type !== "FILE" || !doc.path) {
@@ -398,4 +400,131 @@ export async function runDeckExtraction(
   const content = choice?.message?.content;
   if (!content) throw new Error("The model returned no extraction");
   return JSON.parse(content) as DeckProfile;
+}
+
+// -------------------------------------------------------- devil's advocate
+
+export type DevilsAdvocateResult = {
+  verdict: "WELL_SUPPORTED" | "NEEDS_STRONGER_EVIDENCE" | "THESIS_AT_RISK";
+  bearCase: string;
+  rebuttals: {
+    claim: string;
+    counterargument: string;
+    severity: "minor" | "notable" | "serious";
+    evidenceToRequest: string;
+  }[];
+  keyQuestions: string[];
+};
+
+const DA_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["verdict", "bearCase", "rebuttals", "keyQuestions"],
+  properties: {
+    verdict: {
+      type: "string",
+      enum: ["WELL_SUPPORTED", "NEEDS_STRONGER_EVIDENCE", "THESIS_AT_RISK"],
+      description: "How well the document's thesis survives adversarial scrutiny",
+    },
+    bearCase: {
+      type: "string",
+      description:
+        "The strongest coherent bear case against this investment, in 4-6 sentences, written as a skeptical IC member would state it",
+    },
+    rebuttals: {
+      type: "array",
+      description: "Specific claims challenged, most damaging first",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["claim", "counterargument", "severity", "evidenceToRequest"],
+        properties: {
+          claim: {
+            type: "string",
+            description: "The document's claim, quoted or tightly paraphrased",
+          },
+          counterargument: {
+            type: "string",
+            description: "The strongest honest rebuttal of that claim",
+          },
+          severity: { type: "string", enum: ["minor", "notable", "serious"] },
+          evidenceToRequest: {
+            type: "string",
+            description: "What evidence would settle it — the ask for the deal team",
+          },
+        },
+      },
+    },
+    keyQuestions: {
+      type: "array",
+      description: "The 3-6 hardest questions the IC should ask the presenting team",
+      items: { type: "string" },
+    },
+  },
+} as const;
+
+/**
+ * 😈 Adversarial read of a one-pager / five-pager / proposal against the
+ * firm's devil's-advocate rubric for that document kind.
+ */
+export async function runDevilsAdvocate(documentId: string): Promise<DevilsAdvocateResult> {
+  const doc = await db.document.findUniqueOrThrow({
+    where: { id: documentId },
+    include: { deal: { include: { assetClass: true } } },
+  });
+  const rubric = await db.reviewStandard.findUnique({
+    where: { kind_mode: { kind: doc.kind, mode: "DEVILS_ADVOCATE" } },
+  });
+  if (!rubric) throw new Error("No devil's-advocate rubric is configured for this document kind");
+  if (doc.type !== "FILE" || !doc.path) {
+    throw new Error("Devil's advocate needs an uploaded file — links can't be analyzed");
+  }
+
+  let text = (
+    await extractDocumentText(
+      path.join(UPLOAD_ROOT, doc.path),
+      doc.previewPath ? path.join(UPLOAD_ROOT, doc.previewPath) : null
+    )
+  ).trim();
+  if (!text) {
+    throw new Error("No text could be extracted from this document (scanned image?)");
+  }
+  if (text.length > MAX_DOC_CHARS) text = text.slice(0, MAX_DOC_CHARS);
+
+  const completion = await azureClient().chat.completions.create({
+    model: AI_MODEL,
+    response_format: {
+      type: "json_schema",
+      json_schema: { name: "devils_advocate", strict: true, schema: DA_SCHEMA },
+    },
+    messages: [
+      {
+        role: "system",
+        content:
+          "You are the designated devil's advocate on an institutional investment " +
+          "committee. Your job is to argue AGAINST the investment as persuasively as honesty " +
+          "allows: attack the thesis, the evidence, and the incentives. Be specific and " +
+          "steelman the counterarguments — no generic risk boilerplate. Stay honest: do not " +
+          "invent facts, and concede strength where the document earns it. The deal team " +
+          "will use this to pressure-test the idea before presenting.",
+      },
+      {
+        role: "user",
+        content:
+          `Deal: ${doc.deal.managerName} — ${doc.deal.fundName} ` +
+          `(${doc.deal.assetClass.name}${doc.deal.strategy ? `, ${doc.deal.strategy}` : ""}).\n` +
+          `Document: ${doc.kind}, "${doc.name}" (v${doc.version}).\n\n` +
+          `The committee's devil's-advocate rubric:\n${rubric.prompt}\n\n` +
+          `--- DOCUMENT TEXT ---\n${text}`,
+      },
+    ],
+  });
+
+  const choice = completion.choices[0];
+  if (choice?.finish_reason === "content_filter") {
+    throw new Error("The analysis was blocked by the Azure OpenAI content filter");
+  }
+  const content = choice?.message?.content;
+  if (!content) throw new Error("The model returned no analysis");
+  return JSON.parse(content) as DevilsAdvocateResult;
 }

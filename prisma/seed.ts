@@ -174,11 +174,49 @@ Flag anything else a careful institutional LP would raise, including unusual or 
 - Flag inconsistencies, evasive answers, or material omissions a careful ODD analyst would chase.`,
     },
   ];
-  for (const s of standards) {
+  const rubrics = [
+    {
+      kind: "ONE_PAGER",
+      title: "Devil's advocate — one-pager rubric",
+      prompt: `Argue against this idea the way our most skeptical IC member would:
+- Thesis: why might the stated edge not exist, not persist, or already be priced? Who is on the other side of these trades and why are they wrong?
+- Crowding & capacity: is this a consensus trade dressed up as differentiated? Does the strategy degrade at the proposed AUM?
+- Track record: distinguish skill from beta, leverage, and a favorable regime. Watch for cherry-picked benchmarks, short samples, backtests presented as live results, and survivorship.
+- Team: dependence on one person; unproven spin-out dynamics; why did they really leave their last firm?
+- Economics: does the fee load consume the edge? Alignment of GP incentives with ours.
+- Regime risk: in what plausible macro environment does this lose badly, and what is the realistic worst 12 months?
+- What is conspicuously missing from the document that the team should have addressed?`,
+    },
+    {
+      kind: "FIVE_PAGER",
+      title: "Devil's advocate — five-pager rubric",
+      prompt: `Full adversarial review before IC presentation:
+- Attack the core thesis and each supporting pillar separately; identify the single assumption that, if wrong, breaks the case.
+- Evidence quality: are return drivers demonstrated or asserted? Attribution vs luck; sample length; regime dependence; benchmark choice.
+- Portfolio fit: correlation with our existing book in stress scenarios (not calm ones); what we're really paying for after fees and taxes.
+- Liquidity: mismatch between fund terms and underlying assets; our exit options in a drawdown; gates and side-pocket risk in practice.
+- Operational and business risk: firm viability at current AUM, key-person, concentration of investors, service-provider quality.
+- Sizing: why the proposed allocation could be too large; what position would we actually want after a 20% drawdown?
+- The strongest competing use of this capital, and what would need to be true to prefer this deal to it.`,
+    },
+    {
+      kind: "PROPOSAL",
+      title: "Devil's advocate — investment proposal rubric",
+      prompt: `Final pressure-test before approvals:
+- Has anything material changed since the five-pager (performance, personnel, terms, AUM)? Are stale numbers being carried forward?
+- Do the proposed terms match what was negotiated? Any drift on fees, liquidity, or capacity rights?
+- Are ODD and legal findings honestly reflected, or sanded down? Quote any tension between this document and earlier diligence.
+- Concentration and pacing: portfolio-level effects of this commitment now vs waiting a quarter.
+- Exit discipline: what specific, observable triggers would make us redeem or not re-up, and are they stated?
+- If we had to defend this allocation to our board after a bad first year, what in this document would look naive?`,
+    },
+  ];
+  for (const s of [...standards, ...rubrics.map((r) => ({ ...r, mode: "DEVILS_ADVOCATE" }))]) {
+    const mode = "mode" in s ? (s as { mode: string }).mode : "STANDARDS";
     await db.reviewStandard.upsert({
-      where: { kind: s.kind },
+      where: { kind_mode: { kind: s.kind, mode } },
       update: {},
-      create: s,
+      create: { kind: s.kind, mode, title: s.title, prompt: s.prompt },
     });
   }
 

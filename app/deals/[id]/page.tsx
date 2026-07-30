@@ -46,6 +46,7 @@ const EVENT_LABELS: Record<string, string> = {
   IC_UNSCHEDULED: "removed the deal from the IC agenda",
   AI_REVIEW_RUN: "ran an AI document review",
   AI_PROFILE_BUILT: "built the AI manager profile",
+  AI_DEVILS_ADVOCATE_RUN: "ran a devil's-advocate analysis",
   APPROVAL_GRANTED: "signed an approval",
   APPROVAL_REJECTED: "rejected the deal at approval",
   DEAL_APPROVED: "gave final approval — deal approved",
@@ -81,8 +82,13 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
   if (!deal) notFound();
 
   const users = await db.user.findMany({ where: { active: true }, orderBy: { name: "asc" } });
-  const standards = await db.reviewStandard.findMany({ select: { kind: true } });
-  const standardKinds = new Set(standards.map((s) => s.kind));
+  const standards = await db.reviewStandard.findMany({ select: { kind: true, mode: true } });
+  const standardKinds = new Set(
+    standards.filter((s) => s.mode === "STANDARDS").map((s) => s.kind)
+  );
+  const advocateKinds = new Set(
+    standards.filter((s) => s.mode === "DEVILS_ADVOCATE").map((s) => s.kind)
+  );
   const peBenchmark = await db.benchmark.findFirst({ where: { kind: "PE_QUINTILES" } });
   const profileData = deal.profile
     ? (JSON.parse(deal.profile.data) as import("@/lib/ai").DeckProfile)
@@ -90,6 +96,16 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
   const profileableIds = aiConfigured()
     ? deal.documents
         .filter((d) => d.kind === "PITCH_DECK" && d.type === "FILE")
+        .map((d) => d.id)
+    : [];
+  const advocateIds = aiConfigured()
+    ? deal.documents
+        .filter(
+          (d) =>
+            advocateKinds.has(d.kind) &&
+            d.type === "FILE" &&
+            (TEXT_EXTRACT_EXTS.has(path.extname(d.name).toLowerCase()) || d.previewPath)
+        )
         .map((d) => d.id)
     : [];
   const reviewableIds = aiConfigured()
@@ -258,6 +274,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
             canAttach={canAttach}
             reviewableIds={reviewableIds}
             profileableIds={manager ? profileableIds : []}
+            advocateIds={advocateIds}
           />
 
           <AIReviews reviews={deal.documentReviews} />

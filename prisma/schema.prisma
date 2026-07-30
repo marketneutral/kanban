@@ -205,13 +205,17 @@ model Benchmark {
   data String // JSON
 }
 
-// Admin-editable review standards: the prompt an AI review runs against,
-// per document kind (e.g. LPA legal standards, DDQ operational standards).
+// Admin-editable review standards and rubrics: the prompt an AI analysis runs
+// against, per document kind and mode (STANDARDS reviews an LPA/DDQ against
+// firm standards; DEVILS_ADVOCATE rebuts a one-/five-pager or proposal).
 model ReviewStandard {
   id     String @id @default(cuid())
-  kind   String @unique // document kind this standard applies to
+  kind   String // document kind this standard applies to
+  mode   String @default("STANDARDS") // STANDARDS | DEVILS_ADVOCATE
   title  String
   prompt String
+
+  @@unique([kind, mode])
 }
 
 model DocumentReview {
@@ -220,6 +224,7 @@ model DocumentReview {
   documentId  String
   deal        Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
   dealId      String
+  mode        String   @default("STANDARDS") // STANDARDS | DEVILS_ADVOCATE
   model       String
   status      String   @default("COMPLETE") // COMPLETE | FAILED
   assessment  String? // STANDARD | NEGOTIABLE_ISSUES | SIGNIFICANT_CONCERNS

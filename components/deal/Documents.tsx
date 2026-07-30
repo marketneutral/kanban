@@ -1,7 +1,7 @@
 import { DOC_KINDS, DOC_KIND_LABELS, type DocKind } from "@/lib/types";
 import { fmtDate } from "@/lib/format";
 import { addDocument } from "@/app/actions/documents";
-import { requestDocumentReview } from "@/app/actions/ai";
+import { requestDocumentReview, requestDevilsAdvocate } from "@/app/actions/ai";
 import { buildProfileFromDocument } from "@/app/actions/profile";
 
 type Doc = {
@@ -21,6 +21,7 @@ export default function Documents({
   canAttach,
   reviewableIds = [],
   profileableIds = [],
+  advocateIds = [],
 }: {
   dealId: string;
   documents: Doc[];
@@ -29,9 +30,12 @@ export default function Documents({
   reviewableIds?: string[];
   /** pitch decks eligible for AI profile extraction */
   profileableIds?: string[];
+  /** pagers/proposals eligible for a devil's-advocate analysis */
+  advocateIds?: string[];
 }) {
   const reviewable = new Set(reviewableIds);
   const profileable = new Set(profileableIds ?? []);
+  const advocate = new Set(advocateIds ?? []);
   const byKind = new Map<string, Doc[]>();
   for (const d of documents) {
     if (!byKind.has(d.kind)) byKind.set(d.kind, []);
@@ -107,6 +111,18 @@ export default function Documents({
                         className="rounded-md border border-accent-200 bg-accent-50 px-2 py-0.5 text-[11px] font-medium text-accent-800 hover:bg-accent-100"
                       >
                         ✨ AI review
+                      </button>
+                    </form>
+                  )}
+                  {advocate.has(d.id) && (
+                    <form action={requestDevilsAdvocate} className="shrink-0">
+                      <input type="hidden" name="documentId" value={d.id} />
+                      <button
+                        type="submit"
+                        title="Adversarial rebuttal against the committee's rubric (takes ~a minute)"
+                        className="rounded-md border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-700 hover:bg-red-100"
+                      >
+                        😈 Devil&apos;s advocate
                       </button>
                     </form>
                   )}
