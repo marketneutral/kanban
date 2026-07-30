@@ -1,0 +1,14 @@
+services:
+  allocator:
+    build: .
+    ports:
+      - "${PORT:-8642}:8642"
+    environment:
+      # set SEED=1 on first run to load the demo roster and sample deals
+      SEED: "${SEED:-0}"
+    volumes:
+      - allocator-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  allocator-data:

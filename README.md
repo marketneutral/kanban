@@ -27,6 +27,30 @@ Sign in from the roster (v1 is passwordless, for a trusted network — every act
 attributed to the selected user in the audit trail). The seeded **Avery Stone** holds the
 Admin role for managing users, roles and asset classes at `/admin`.
 
+## Running with Docker
+
+The container listens on **port 8642** (deliberately non-standard, to stay clear of other
+apps on the host). The SQLite database and uploaded documents live in `/app/data` —
+mount a volume there or they vanish with the container.
+
+```bash
+docker compose up -d --build          # http://localhost:8642
+SEED=1 docker compose up -d --build   # first run: also load demo roster + sample deals
+```
+
+Or without compose:
+
+```bash
+docker build -t allocator .
+docker run -d -p 8642:8642 -v allocator-data:/app/data -e SEED=1 --name allocator allocator
+```
+
+To use a different host port, map it in compose (`PORT=9001 docker compose up -d`
+publishes `9001 -> 8642`) or change `-p` in `docker run`. The in-container port follows
+the `PORT` env var. Seeding is idempotent — `SEED=1` never duplicates data. On startup
+the container runs `prisma db push`, which also applies schema updates to an existing
+database.
+
 ## Scripts
 
 | Command | What it does |

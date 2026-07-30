@@ -1,21 +1,12 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { GeistSans } from "geist/font/sans";
+import { GeistMono } from "geist/font/mono";
 import Link from "next/link";
 import "./globals.css";
 import { getCurrentUser } from "@/lib/session";
 import { signOut } from "@/app/actions/auth";
 import { isAdmin, ROLE_LABELS, type Role } from "@/lib/types";
 import { initials } from "@/lib/format";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "Allocator — Investment Process",
@@ -32,7 +23,7 @@ export default async function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${GeistSans.variable} ${GeistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <header className="sticky top-0 z-40 border-b border-stone-200 bg-white/90 backdrop-blur">
