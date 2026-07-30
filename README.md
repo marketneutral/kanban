@@ -21,6 +21,7 @@ npm install
 npm run db:push           # create the database schema
 npm run db:seed           # seed users, asset classes, sample deals
 npm run dev               # http://localhost:3000
+npm run dev -- -p 8642    # …or any other port, if 3000 is taken
 ```
 
 Sign in from the roster (v1 is passwordless, for a trusted network — every action is
@@ -34,8 +35,20 @@ apps on the host). The SQLite database and uploaded documents live in `/app/data
 mount a volume there or they vanish with the container.
 
 ```bash
-docker compose up -d --build          # http://localhost:8642
-SEED=1 docker compose up -d --build   # first run: also load demo roster + sample deals
+# first run — builds, starts, and loads the demo roster + sample deals
+SEED=1 docker compose up -d --build
+# → http://localhost:8642  (sign in as Avery Stone for admin)
+
+# subsequent starts
+docker compose up -d
+```
+
+Everyday operations:
+
+```bash
+docker compose logs -f      # watch the app
+docker compose down         # stop — the data volume survives
+git pull && docker compose up -d --build   # upgrade — schema migrates on boot, data kept
 ```
 
 Or without compose:
