@@ -53,6 +53,8 @@ const EVENT_LABELS: Record<string, string> = {
   APPROVAL_GRANTED: "signed an approval",
   APPROVAL_REJECTED: "rejected the deal at approval",
   DEAL_APPROVED: "gave final approval — deal approved",
+  CHECKLIST_CHECKED: "checked off a checklist item",
+  CHECKLIST_UNCHECKED: "unchecked a checklist item",
 };
 
 export default async function DealPage({ params }: { params: Promise<{ id: string }> }) {
@@ -79,7 +81,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
       checklistItems: { include: { doneBy: true } },
       presentations: true,
       approvals: { include: { decidedBy: true } },
-      events: { include: { actor: true }, orderBy: { createdAt: "desc" }, take: 30 },
+      events: { include: { actor: true }, orderBy: { createdAt: "desc" } },
     },
   });
   if (!deal) notFound();
@@ -323,7 +325,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
             status={status}
             gate={gate}
             manager={manager}
-            canFund={canOps}
+            canFund={canOps || hasRole(user, "CFO")}
             admin={admin}
             fundedAt={deal.fundedAt}
             prevStage={idx > 0 ? (STAGES[idx - 1] as Stage) : null}
@@ -334,8 +336,11 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
           <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
             <h2 className="text-[13px] font-semibold uppercase tracking-wide text-stone-400">
               Activity
+              <span className="ml-1.5 rounded-full bg-stone-100 px-1.5 text-[10px] font-medium normal-case tracking-normal text-stone-500">
+                {deal.events.length}
+              </span>
             </h2>
-            <ol className="mt-3 space-y-3">
+            <ol className="mt-3 max-h-[28rem] space-y-3 overflow-y-auto pr-1">
               {deal.events.map((e) => {
                 const detail = e.detail ? (JSON.parse(e.detail) as Record<string, string>) : null;
                 return (

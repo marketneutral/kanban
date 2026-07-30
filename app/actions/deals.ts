@@ -183,10 +183,12 @@ export async function setDealStatus(formData: FormData) {
   revalidatePath(`/deals/${dealId}`);
 }
 
-/** Ops (or admin) marks the approved allocation wired: closed and funded. */
+/** Ops or the CFO (or admin) marks the approved allocation wired: closed and funded. */
 export async function markFunded(formData: FormData) {
   const user = await requireUserAction();
-  if (!hasRole(user, "OPS", "ADMIN")) throw new Error("Only Ops can mark a deal funded");
+  if (!hasRole(user, "OPS", "CFO", "ADMIN")) {
+    throw new Error("Only Ops or the CFO can mark a deal funded");
+  }
   const dealId = String(formData.get("dealId") ?? "");
   const dateRaw = String(formData.get("fundedAt") ?? "").trim();
   const fundedAt = dateRaw ? new Date(`${dateRaw}T00:00:00Z`) : new Date();

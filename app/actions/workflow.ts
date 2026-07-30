@@ -203,6 +203,14 @@ export async function toggleChecklistItem(formData: FormData) {
       data: { oddCompletedAt: null, oddCompletedById: null },
     });
   }
+  await db.stageEvent.create({
+    data: {
+      dealId: item.dealId,
+      actorId: user.id,
+      action: nowDone ? "CHECKLIST_CHECKED" : "CHECKLIST_UNCHECKED",
+      detail: JSON.stringify({ title: item.label, track: item.track }),
+    },
+  });
   touch(item.dealId);
 }
 
