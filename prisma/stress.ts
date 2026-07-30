@@ -49,7 +49,8 @@ async function main() {
         assetClassId: pick(classes).id,
         leadId: lead.id,
         strategy: null,
-        targetSizeMm: Math.round(5 + rand() * 145),
+        // log-uniform 3–900mm so the map shows real size contrast
+        targetSizeMm: Math.round(3 * Math.pow(300, rand())),
         source: TAG,
         stage: pick(STAGES),
         status: rand() < 0.06 ? "ON_HOLD" : "ACTIVE",

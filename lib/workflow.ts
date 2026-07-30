@@ -207,17 +207,29 @@ export type ApprovalRow = {
 export type ChainStep = {
   step: "MD" | "LEGAL" | "COO" | "CEO";
   row: ApprovalRow | undefined;
+  /** the role whose signature this step requires */
+  requiredRole: "MD_PUBLIC" | "MD_PRIVATE" | "LEGAL" | "COO" | "CEO";
   /** step can be acted on right now */
   available: boolean;
   /** why it can't be acted on yet (when pending and not available) */
   blockedReason: string | null;
 };
 
+/** Which MD signs a deal, from its asset class's market type. */
+export function mdRoleFor(marketType: string): "MD_PUBLIC" | "MD_PRIVATE" {
+  return marketType === "PRIVATE" ? "MD_PRIVATE" : "MD_PUBLIC";
+}
+
 /**
  * MD and Legal sign in parallel (Legal additionally gated on the legal doc
  * track), then COO, then CEO — the sequential routing decided in PLAN.md.
+ * The MD step routes to the MD matching the deal's market type.
  */
-export function evaluateChain(deal: GateDeal, approvals: ApprovalRow[]): ChainStep[] {
+export function evaluateChain(
+  deal: GateDeal,
+  approvals: ApprovalRow[],
+  mdRole: "MD_PUBLIC" | "MD_PRIVATE"
+): ChainStep[] {
   const get = (s: string) => approvals.find((a) => a.step === s);
   const md = get("MD");
   const legal = get("LEGAL");
@@ -230,12 +242,14 @@ export function evaluateChain(deal: GateDeal, approvals: ApprovalRow[]): ChainSt
     {
       step: "MD",
       row: md,
+      requiredRole: mdRole,
       available: actionable && md?.status === "PENDING",
       blockedReason: null,
     },
     {
       step: "LEGAL",
       row: legal,
+      requiredRole: "LEGAL",
       available: actionable && legal?.status === "PENDING" && legalDocs.ready,
       blockedReason:
         legal?.status === "PENDING" && !legalDocs.ready
@@ -245,6 +259,7 @@ export function evaluateChain(deal: GateDeal, approvals: ApprovalRow[]): ChainSt
     {
       step: "COO",
       row: coo,
+      requiredRole: "COO",
       available:
         actionable &&
         coo?.status === "PENDING" &&
@@ -258,6 +273,7 @@ export function evaluateChain(deal: GateDeal, approvals: ApprovalRow[]): ChainSt
     {
       step: "CEO",
       row: ceo,
+      requiredRole: "CEO",
       available: actionable && ceo?.status === "PENDING" && coo?.status === "APPROVED",
       blockedReason:
         ceo?.status === "PENDING" && coo?.status !== "APPROVED" ? "Waiting on COO approval" : null,

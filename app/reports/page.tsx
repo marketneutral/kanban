@@ -1,15 +1,8 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/session";
-import {
-  STAGES,
-  STAGE_LABELS,
-  APPROVAL_STEPS,
-  APPROVAL_STEP_LABELS,
-  type ApprovalStep,
-  type Stage,
-} from "@/lib/types";
-import { evaluateChain, gateInclude } from "@/lib/workflow";
+import { STAGES, STAGE_LABELS, ROLE_LABELS } from "@/lib/types";
+import { evaluateChain, gateInclude, mdRoleFor } from "@/lib/workflow";
 import { fmtMm, daysSince, initials } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -56,19 +49,21 @@ export default async function ReportsPage() {
     return { n: inStage.length, mm: inStage.reduce((t, d) => t + (d.targetSizeMm ?? 0), 0) };
   });
 
-  // ---- approval queues -----------------------------------------------------
+  // ---- approval queues: one per signing role -------------------------------
+  // The MD step routes by market type, so there are five queues, not four.
+  const QUEUE_ROLES = ["MD_PUBLIC", "MD_PRIVATE", "LEGAL", "COO", "CEO"] as const;
   const inChain = deals.filter((d) => d.stage === "APPROVALS" && d.status === "ACTIVE");
-  const queues = APPROVAL_STEPS.map((step) => ({
-    step,
-    deals: inChain.filter((d) => {
-      const c = evaluateChain(d, d.approvals).find((x) => x.step === step)!;
-      return c.available;
-    }),
+  const actionable = inChain.flatMap((d) =>
+    evaluateChain(d, d.approvals, mdRoleFor(d.assetClass.marketType))
+      .filter((c) => c.available)
+      .map((c) => ({ role: c.requiredRole, deal: d }))
+  );
+  const queues = QUEUE_ROLES.map((role) => ({
+    role,
+    deals: actionable.filter((a) => a.role === role).map((a) => a.deal),
   }));
   const myRoles = new Set(user.roles.map((r) => r.role));
-  const myQueue = queues
-    .filter((q) => myRoles.has(q.step))
-    .flatMap((q) => q.deals.map((d) => ({ step: q.step, deal: d })));
+  const myQueue = actionable.filter((a) => myRoles.has(a.role));
 
   // ---- workload ------------------------------------------------------------
   const workload = users
@@ -98,14 +93,14 @@ export default async function ReportsPage() {
             Waiting on you
           </h2>
           <ul className="mt-2 space-y-1.5">
-            {myQueue.map(({ step, deal }) => (
-              <li key={`${step}-${deal.id}`}>
+            {myQueue.map(({ role, deal }) => (
+              <li key={`${role}-${deal.id}`}>
                 <Link
                   href={`/deals/${deal.id}`}
                   className="group flex items-center gap-2 text-sm text-stone-800"
                 >
                   <span className="rounded bg-white px-1.5 py-0.5 text-[11px] font-semibold text-accent-800 shadow-sm">
-                    {APPROVAL_STEP_LABELS[step]}
+                    {ROLE_LABELS[role]}
                   </span>
                   <span className="font-medium group-hover:underline">{deal.managerName}</span>
                   <span className="text-stone-500">
@@ -189,11 +184,11 @@ export default async function ReportsPage() {
             What each signer can act on right now, in routing order.
           </p>
         </header>
-        <div className="grid gap-px bg-stone-100 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-px bg-stone-100 sm:grid-cols-2 lg:grid-cols-5">
           {queues.map((q) => (
-            <div key={q.step} className="bg-white p-4">
+            <div key={q.role} className="bg-white p-4">
               <h3 className="text-[12px] font-semibold text-stone-600">
-                {APPROVAL_STEP_LABELS[q.step as ApprovalStep]}
+                {ROLE_LABELS[q.role]}
                 <span className="ml-1.5 rounded-full bg-stone-100 px-1.5 text-[11px] font-medium text-stone-500">
                   {q.deals.length}
                 </span>

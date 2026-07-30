@@ -3,18 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireUserAction } from "@/lib/session";
-import { hasRole, APPROVAL_STEPS, type ApprovalStep, type Role } from "@/lib/types";
-import { evaluateChain, gateInclude, resetApprovals } from "@/lib/workflow";
+import { hasRole, ROLE_LABELS, APPROVAL_STEPS, type ApprovalStep } from "@/lib/types";
+import { evaluateChain, gateInclude, mdRoleFor, resetApprovals } from "@/lib/workflow";
 
-// Approval steps map 1:1 to the role that may sign them. Admins deliberately
-// cannot approve — sign-off authority is the product.
-const STEP_ROLE: Record<ApprovalStep, Role> = {
-  MD: "MD",
-  LEGAL: "LEGAL",
-  COO: "COO",
-  CEO: "CEO",
-};
-
+// Each chain step requires the signature of a specific role (the MD step routes
+// by the deal's market type). Admins deliberately cannot approve — sign-off
+// authority is the product.
 export async function decideApproval(formData: FormData) {
   const user = await requireUserAction();
   const dealId = String(formData.get("dealId") ?? "");
@@ -23,22 +17,22 @@ export async function decideApproval(formData: FormData) {
   const note = String(formData.get("note") ?? "").trim();
 
   if (!APPROVAL_STEPS.includes(step)) throw new Error("Unknown approval step");
-  if (!hasRole(user, STEP_ROLE[step])) {
-    throw new Error(`Only a ${STEP_ROLE[step]} can decide this step`);
-  }
   if (decision !== "approve" && decision !== "reject") throw new Error("Unknown decision");
   if (decision === "reject" && !note) throw new Error("A note is required to reject");
 
   const deal = await db.deal.findUniqueOrThrow({
     where: { id: dealId },
-    include: { ...gateInclude, approvals: true },
+    include: { ...gateInclude, approvals: true, assetClass: true },
   });
   if (deal.stage !== "APPROVALS" || deal.status !== "ACTIVE") {
     throw new Error("Deal is not in the approval chain");
   }
 
-  const chain = evaluateChain(deal, deal.approvals);
+  const chain = evaluateChain(deal, deal.approvals, mdRoleFor(deal.assetClass.marketType));
   const chainStep = chain.find((c) => c.step === step)!;
+  if (!hasRole(user, chainStep.requiredRole)) {
+    throw new Error(`Only a ${ROLE_LABELS[chainStep.requiredRole]} can decide this step`);
+  }
   if (!chainStep.available) {
     throw new Error(chainStep.blockedReason ?? "This step is not actionable yet");
   }

@@ -59,18 +59,23 @@ async function seedAsset(opts: {
 }
 
 async function main() {
-  const assetClassNames = [
-    "Equity Long/Short",
-    "Credit",
-    "Global Macro",
-    "Private Equity",
-    "Venture Capital",
-    "Real Assets",
-    "Multi-Strategy",
+  // marketType routes the MD approval: PUBLIC → MD — Publics, PRIVATE → MD — Privates
+  const assetClassDefs: Array<[string, string]> = [
+    ["Equity Long/Short", "PUBLIC"],
+    ["Credit", "PUBLIC"],
+    ["Global Macro", "PUBLIC"],
+    ["Multi-Strategy", "PUBLIC"],
+    ["Private Equity", "PRIVATE"],
+    ["Venture Capital", "PRIVATE"],
+    ["Real Assets", "PRIVATE"],
   ];
   const assetClasses: Record<string, string> = {};
-  for (const name of assetClassNames) {
-    const ac = await db.assetClass.upsert({ where: { name }, update: {}, create: { name } });
+  for (const [name, marketType] of assetClassDefs) {
+    const ac = await db.assetClass.upsert({
+      where: { name },
+      update: { marketType },
+      create: { name, marketType },
+    });
     assetClasses[name] = ac.id;
   }
 
@@ -78,9 +83,16 @@ async function main() {
     { name: "Avery Stone", email: "avery@example.com", roles: ["ADMIN", "DEAL_TEAM"] },
     { name: "Jordan Lee", email: "jordan@example.com", roles: ["DEAL_TEAM"] },
     { name: "Sam Rivera", email: "sam@example.com", roles: ["DEAL_TEAM"] },
+    { name: "Nadia Osei", email: "nadia@example.com", roles: ["DEAL_TEAM"] },
+    { name: "Marcus Webb", email: "marcus@example.com", roles: ["DEAL_TEAM"] },
+    { name: "Ines Delgado", email: "ines@example.com", roles: ["DEAL_TEAM"] },
+    { name: "Tom Nakamura", email: "tom@example.com", roles: ["DEAL_TEAM"] },
     { name: "Alex Kim", email: "alex@example.com", roles: ["OPS"] },
+    { name: "Omar Haddad", email: "omar@example.com", roles: ["OPS"] },
     { name: "Priya Shah", email: "priya@example.com", roles: ["LEGAL"] },
-    { name: "Morgan Chen", email: "morgan@example.com", roles: ["MD", "DEAL_TEAM"] },
+    { name: "Sofia Lindgren", email: "sofia@example.com", roles: ["LEGAL"] },
+    { name: "Morgan Chen", email: "morgan@example.com", roles: ["MD_PUBLIC"] },
+    { name: "Grace Kimball", email: "grace@example.com", roles: ["MD_PRIVATE"] },
     { name: "Taylor Brooks", email: "taylor@example.com", roles: ["COO"] },
     { name: "Casey Whitfield", email: "casey@example.com", roles: ["CEO"] },
   ];
@@ -256,7 +268,7 @@ Flag anything else a careful institutional LP would raise, including unusual or 
         strategy: "Distressed / special situations",
         targetSizeMm: 75,
         lead: "Jordan Lee",
-        team: ["Sam Rivera"],
+        team: ["Sam Rivera", "Marcus Webb"],
         source: "Prime broker cap intro",
         stage: "ONE_PAGER",
         daysAgo: 12,
@@ -268,7 +280,7 @@ Flag anything else a careful institutional LP would raise, including unusual or 
         strategy: "Global TMT long/short",
         targetSizeMm: 50,
         lead: "Sam Rivera",
-        team: ["Jordan Lee"],
+        team: ["Jordan Lee", "Tom Nakamura"],
         source: "Existing manager referral",
         stage: "FIVE_PAGER",
         daysAgo: 25,
@@ -279,7 +291,7 @@ Flag anything else a careful institutional LP would raise, including unusual or 
         assetClass: "Global Macro",
         strategy: "Discretionary EM macro",
         targetSizeMm: 100,
-        lead: "Morgan Chen",
+        lead: "Nadia Osei",
         team: ["Jordan Lee", "Sam Rivera"],
         source: "Conference — Sohn",
         stage: "ODD_LEGAL",
@@ -304,7 +316,7 @@ Flag anything else a careful institutional LP would raise, including unusual or 
         strategy: "Infrastructure secondaries",
         targetSizeMm: 60,
         lead: "Sam Rivera",
-        team: ["Morgan Chen"],
+        team: ["Ines Delgado"],
         source: "Placement agent",
         stage: "APPROVALS",
         daysAgo: 9,
@@ -315,7 +327,7 @@ Flag anything else a careful institutional LP would raise, including unusual or 
         assetClass: "Multi-Strategy",
         strategy: "Multi-PM platform",
         targetSizeMm: 120,
-        lead: "Morgan Chen",
+        lead: "Tom Nakamura",
         team: ["Jordan Lee"],
         source: "Existing relationship",
         stage: "APPROVED",
@@ -471,8 +483,11 @@ Flag anything else a careful institutional LP would raise, including unusual or 
       // Deals in (or past) the approval chain get their approval rows.
       if (stageIdx >= STAGE_ORDER.indexOf("APPROVALS")) {
         const finalized = d.stage === "APPROVED";
+        // The MD signature routes by market type: Grace (Privates) signs
+        // Ironbark's Real Assets deal, Morgan (Publics) signs Sable Peak.
+        const isPrivate = assetClassDefs.find(([n]) => n === d.assetClass)?.[1] === "PRIVATE";
         const signers: Record<string, string> = {
-          MD: userIds["Morgan Chen"]!,
+          MD: isPrivate ? userIds["Grace Kimball"]! : userIds["Morgan Chen"]!,
           LEGAL: userIds["Priya Shah"]!,
           COO: userIds["Taylor Brooks"]!,
           CEO: userIds["Casey Whitfield"]!,

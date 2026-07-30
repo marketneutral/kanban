@@ -1,14 +1,7 @@
 import type { ChainStep } from "@/lib/workflow";
-import { APPROVAL_STEP_LABELS, type ApprovalStep, type Role } from "@/lib/types";
+import { APPROVAL_STEP_LABELS, ROLE_LABELS } from "@/lib/types";
 import { fmtDate } from "@/lib/format";
 import { decideApproval } from "@/app/actions/approvals";
-
-const STEP_ROLE: Record<ApprovalStep, Role> = {
-  MD: "MD",
-  LEGAL: "LEGAL",
-  COO: "COO",
-  CEO: "CEO",
-};
 
 export default function ApprovalChain({
   dealId,
@@ -38,7 +31,7 @@ export default function ApprovalChain({
       <ol className="mt-3 space-y-2.5">
         {chain.map((c) => {
           const approved = c.row?.status === "APPROVED";
-          const mine = userRoles.includes(STEP_ROLE[c.step]);
+          const mine = userRoles.includes(c.requiredRole);
           return (
             <li
               key={c.step}
@@ -63,7 +56,9 @@ export default function ApprovalChain({
                   {approved ? "✓" : c.available ? "!" : "·"}
                 </span>
                 <span className="flex-1 text-sm font-medium text-stone-800">
-                  {APPROVAL_STEP_LABELS[c.step]}
+                  {c.step === "MD"
+                    ? `${ROLE_LABELS[c.requiredRole]} — Investment`
+                    : APPROVAL_STEP_LABELS[c.step]}
                 </span>
                 {approved ? (
                   <span className="text-[11px] text-stone-400">

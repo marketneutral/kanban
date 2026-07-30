@@ -1,15 +1,28 @@
-export const ROLES = ["DEAL_TEAM", "OPS", "LEGAL", "MD", "COO", "CEO", "ADMIN"] as const;
+export const ROLES = [
+  "DEAL_TEAM",
+  "OPS",
+  "LEGAL",
+  "MD_PUBLIC",
+  "MD_PRIVATE",
+  "COO",
+  "CEO",
+  "ADMIN",
+] as const;
 export type Role = (typeof ROLES)[number];
 
 export const ROLE_LABELS: Record<Role, string> = {
   DEAL_TEAM: "Deal Team",
   OPS: "Ops",
   LEGAL: "Legal",
-  MD: "MD",
+  MD_PUBLIC: "MD — Publics",
+  MD_PRIVATE: "MD — Privates",
   COO: "COO",
   CEO: "CEO",
   ADMIN: "Admin",
 };
+
+export const MARKET_TYPES = ["PUBLIC", "PRIVATE"] as const;
+export type MarketType = (typeof MARKET_TYPES)[number];
 
 export const STAGES = [
   "PIPELINE",
@@ -91,5 +104,5 @@ export function isAdmin(user: { roles: { role: string }[] }): boolean {
 
 /** Roles allowed to create/edit deals and move them through stages. */
 export function canManageDeals(user: { roles: { role: string }[] }): boolean {
-  return hasRole(user, "DEAL_TEAM", "MD", "ADMIN");
+  return hasRole(user, "DEAL_TEAM", "MD_PUBLIC", "MD_PRIVATE", "ADMIN");
 }

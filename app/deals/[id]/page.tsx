@@ -13,7 +13,7 @@ import {
   type Stage,
   type DealStatus,
 } from "@/lib/types";
-import { evaluateGate, evaluateLegal, evaluateChain } from "@/lib/workflow";
+import { evaluateGate, evaluateLegal, evaluateChain, mdRoleFor } from "@/lib/workflow";
 import path from "path";
 import { aiConfigured, TEXT_EXTRACT_EXTS } from "@/lib/ai";
 import ApprovalChain from "@/components/deal/ApprovalChain";
@@ -133,7 +133,9 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
   const needsPresentation = !deal.presentations.some((p) => p.stage === deal.stage);
   const showTracks = idx >= stageIndex("ODD_LEGAL") || deal.checklistItems.length > 0;
   const showChain = deal.stage === "APPROVALS" || deal.stage === "APPROVED";
-  const chain = showChain ? evaluateChain(deal, deal.approvals) : null;
+  const chain = showChain
+    ? evaluateChain(deal, deal.approvals, mdRoleFor(deal.assetClass.marketType))
+    : null;
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-6">

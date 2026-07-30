@@ -36,15 +36,16 @@ model UserRole {
   id     String @id @default(cuid())
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId String
-  role   String // DEAL_TEAM | OPS | LEGAL | MD | COO | CEO | ADMIN
+  role   String // DEAL_TEAM | OPS | LEGAL | MD_PUBLIC | MD_PRIVATE | COO | CEO | ADMIN
 
   @@unique([userId, role])
 }
 
 model AssetClass {
-  id    String @id @default(cuid())
-  name  String @unique
-  deals Deal[]
+  id         String @id @default(cuid())
+  name       String @unique
+  marketType String @default("PUBLIC") // PUBLIC | PRIVATE — routes the MD approval
+  deals      Deal[]
 }
 
 model Deal {

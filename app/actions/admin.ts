@@ -61,6 +61,18 @@ export async function createAssetClass(formData: FormData) {
   revalidatePath("/admin");
 }
 
+export async function toggleAssetClassMarket(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  const ac = await db.assetClass.findUniqueOrThrow({ where: { id } });
+  await db.assetClass.update({
+    where: { id },
+    data: { marketType: ac.marketType === "PUBLIC" ? "PRIVATE" : "PUBLIC" },
+  });
+  revalidatePath("/admin");
+  revalidatePath("/reports");
+}
+
 export async function deleteAssetClass(formData: FormData) {
   await requireAdmin();
   const id = String(formData.get("id") ?? "");

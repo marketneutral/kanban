@@ -46,9 +46,15 @@ type Node = MapDeal & { x: number; y: number; vx?: number; vy?: number; r: numbe
 const W = 1280;
 const H = 760;
 
+// Log-scaled radius with a floor and cap: doubling the target $ adds a fixed
+// increment, so a $900mm ticket doesn't drown out the $10mm ones.
+const R_MIN = 6;
+const R_MAX = 38;
+const MM_MIN = 5; // sizes at or below this all get the floor radius
+
 function radius(mm: number | null): number {
-  if (!mm || mm <= 0) return 8;
-  return Math.max(8, Math.min(34, 4.2 * Math.sqrt(mm)));
+  if (!mm || mm <= 0) return R_MIN;
+  return Math.min(R_MAX, R_MIN + 5.2 * Math.log2(Math.max(mm, MM_MIN) / MM_MIN));
 }
 
 function groupKey(d: MapDeal, g: Grouping): string {
@@ -282,7 +288,7 @@ export default function DealMap({
           </span>
         )}
         <span className="ml-auto flex items-center gap-3 text-stone-400">
-          <span>area = target $</span>
+          <span>size ~ log target $</span>
           <span className="flex items-center gap-1">
             <span className="h-2.5 w-2.5 rounded-full border-2 border-emerald-500" /> gate ready
           </span>

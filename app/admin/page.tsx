@@ -8,6 +8,7 @@ import {
   toggleUserRole,
   createAssetClass,
   deleteAssetClass,
+  toggleAssetClassMarket,
 } from "@/app/actions/admin";
 import { updateReviewStandard } from "@/app/actions/ai";
 import { aiConfigured, AI_MODEL } from "@/lib/ai";
@@ -119,7 +120,9 @@ export default async function AdminPage() {
         <header className="border-b border-stone-100 px-5 py-3">
           <h2 className="text-sm font-semibold text-stone-900">Asset classes</h2>
           <p className="text-xs text-stone-500">
-            Used on deal cards and in reports. Classes in use by deals cannot be removed.
+            Used on deal cards and in reports. Public classes route to the MD — Publics for
+            approval, Private to the MD — Privates; click the tag to switch. Classes in use by
+            deals cannot be removed.
           </p>
         </header>
         <div className="flex flex-wrap gap-2 px-5 py-4">
@@ -129,6 +132,20 @@ export default async function AdminPage() {
               className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white px-3 py-1.5 text-[13px] text-stone-700 shadow-sm"
             >
               {a.name}
+              <form action={toggleAssetClassMarket}>
+                <input type="hidden" name="id" value={a.id} />
+                <button
+                  type="submit"
+                  title={`Switch to ${a.marketType === "PUBLIC" ? "Private" : "Public"} — routes the MD approval`}
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide transition ${
+                    a.marketType === "PRIVATE"
+                      ? "bg-stone-700 text-white hover:bg-stone-600"
+                      : "bg-accent-100 text-accent-800 hover:bg-accent-200"
+                  }`}
+                >
+                  {a.marketType === "PRIVATE" ? "Private" : "Public"}
+                </button>
+              </form>
               <span className="text-[11px] text-stone-400">{a._count.deals}</span>
               {a._count.deals === 0 && (
                 <form action={deleteAssetClass}>
