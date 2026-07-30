@@ -25,10 +25,32 @@ export default function FilterBar({
   const selectCls =
     "rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-700 shadow-sm focus:border-accent-400 focus:outline-none";
 
-  const hasFilters = !!(params.get("assetClass") || params.get("lead") || params.get("show"));
+  const hasFilters = !!(
+    params.get("assetClass") ||
+    params.get("lead") ||
+    params.get("show") ||
+    params.get("q")
+  );
 
   return (
     <div className="flex flex-wrap items-center gap-2">
+      <input
+        type="search"
+        aria-label="Search deals"
+        placeholder="Search manager, fund…"
+        defaultValue={params.get("q") ?? ""}
+        // re-mount when the URL's q changes externally (e.g. Clear)
+        key={params.get("q") ?? ""}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") setParam("q", e.currentTarget.value.trim());
+        }}
+        onBlur={(e) => {
+          if (e.currentTarget.value.trim() !== (params.get("q") ?? "")) {
+            setParam("q", e.currentTarget.value.trim());
+          }
+        }}
+        className={`${selectCls} w-44 placeholder:text-stone-400`}
+      />
       <select
         aria-label="Filter by asset class"
         className={selectCls}
@@ -62,7 +84,8 @@ export default function FilterBar({
         onChange={(e) => setParam("show", e.target.value)}
       >
         <option value="">In progress</option>
-        <option value="all">Including passed</option>
+        <option value="funded">Closed &amp; funded</option>
+        <option value="all">Everything</option>
       </select>
       {hasFilters && (
         <button

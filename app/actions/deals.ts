@@ -4,7 +4,14 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireUserAction } from "@/lib/session";
-import { canManageDeals, stageIndex, STAGES, STAGE_LABELS, type Stage } from "@/lib/types";
+import {
+  canManageDeals,
+  hasRole,
+  stageIndex,
+  STAGES,
+  STAGE_LABELS,
+  type Stage,
+} from "@/lib/types";
 import {
   evaluateGate,
   loadGateDeal,
@@ -145,16 +152,24 @@ export async function moveStage(formData: FormData) {
 export async function setDealStatus(formData: FormData) {
   const user = await requireDealManager();
   const dealId = String(formData.get("dealId") ?? "");
-  const status = String(formData.get("status") ?? "");
-  if (!["ACTIVE", "ON_HOLD", "PASSED"].includes(status)) throw new Error("Invalid status");
+  let status = String(formData.get("status") ?? "");
+  if (!["ACTIVE", "ON_HOLD", "PENCILS_DOWN"].includes(status)) throw new Error("Invalid status");
   const reason = String(formData.get("reason") ?? "").trim();
-  if (status === "PASSED" && !reason) throw new Error("A reason is required to pass on a deal");
+  if (status === "PENCILS_DOWN" && !reason) {
+    throw new Error("A reason is required to go pencils down");
+  }
+
+  const deal = await db.deal.findUniqueOrThrow({ where: { id: dealId } });
+  if (deal.status === "FUNDED") throw new Error("Funded deals are closed — status is final");
+  // Reopening a deal that had gone pencils down after full approval returns it
+  // to APPROVED (its stage), not ACTIVE.
+  if (status === "ACTIVE" && deal.stage === "APPROVED") status = "APPROVED";
 
   await db.deal.update({
     where: { id: dealId },
     data: {
       status,
-      passedReason: status === "PASSED" ? reason : null,
+      pencilsDownReason: status === "PENCILS_DOWN" ? reason : null,
       events: {
         create: {
           actorId: user.id,
@@ -166,4 +181,52 @@ export async function setDealStatus(formData: FormData) {
   });
   revalidatePath("/board");
   revalidatePath(`/deals/${dealId}`);
+}
+
+/** Ops (or admin) marks the approved allocation wired: closed and funded. */
+export async function markFunded(formData: FormData) {
+  const user = await requireUserAction();
+  if (!hasRole(user, "OPS", "ADMIN")) throw new Error("Only Ops can mark a deal funded");
+  const dealId = String(formData.get("dealId") ?? "");
+  const dateRaw = String(formData.get("fundedAt") ?? "").trim();
+  const fundedAt = dateRaw ? new Date(`${dateRaw}T00:00:00Z`) : new Date();
+  if (Number.isNaN(fundedAt.getTime())) throw new Error("Invalid funding date");
+
+  const deal = await db.deal.findUniqueOrThrow({ where: { id: dealId } });
+  if (deal.status !== "APPROVED") {
+    throw new Error("Only fully approved deals can be marked funded");
+  }
+
+  await db.deal.update({
+    where: { id: dealId },
+    data: {
+      status: "FUNDED",
+      fundedAt,
+      events: { create: { actorId: user.id, action: "DEAL_FUNDED" } },
+    },
+  });
+  revalidatePath("/board");
+  revalidatePath(`/deals/${dealId}`);
+  revalidatePath("/reports");
+}
+
+/** Admin-only undo for a mistaken funding mark. */
+export async function revertFunded(formData: FormData) {
+  const user = await requireUserAction();
+  if (!hasRole(user, "ADMIN")) throw new Error("Admin only");
+  const dealId = String(formData.get("dealId") ?? "");
+  const deal = await db.deal.findUniqueOrThrow({ where: { id: dealId } });
+  if (deal.status !== "FUNDED") throw new Error("Deal is not funded");
+
+  await db.deal.update({
+    where: { id: dealId },
+    data: {
+      status: "APPROVED",
+      fundedAt: null,
+      events: { create: { actorId: user.id, action: "DEAL_FUNDING_REVERTED" } },
+    },
+  });
+  revalidatePath("/board");
+  revalidatePath(`/deals/${dealId}`);
+  revalidatePath("/reports");
 }

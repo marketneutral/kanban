@@ -2,8 +2,11 @@
 
 An internal app for managing the manager-allocation investment process: each prospective
 allocation is a card moving through a gated workflow — One-Pager → Five-Pager → ODD & Legal
-→ Investment Proposal → Approvals (MD + Legal → COO → CEO) — with documents, follow-ups,
-role-based actions and summary reporting.
+→ Investment Proposal → Approvals (MD + Legal → CFO → CEO) — with documents, follow-ups,
+role-based actions and summary reporting. The MD signature routes by the deal's market
+type: public asset classes go to the MD — Publics, private ones to the MD — Privates.
+An approved deal is closed out by Ops as **Funded** (hidden from the default board), and
+any deal can go **Pencils Down** at any time — closed non-funded, with a reason.
 
 See [PLAN.md](./PLAN.md) for the full design: workflow gates, roles matrix, data model
 and milestones.
@@ -147,8 +150,10 @@ and a one-pager — so every AI feature is demoable immediately.
   records; versioned documents (upload + link) with role-scoped kinds; ODD & Legal
   parallel checklist tracks with Ops sign-off; gate readiness dots on the board
 - **M4 (done)** — approval chain: MD + Legal in parallel (Legal gated on the legal doc
-  track), then COO, then CEO; CEO signature finalizes the deal; rejection returns the
-  deal to Investment Proposal, voids all signatures, and files the note as a follow-up
+  track), then CFO, then CEO; the MD step routes to MD — Publics or MD — Privates by the
+  deal's asset-class market type (set per class in admin); CEO signature finalizes the
+  deal; rejection returns the deal to Investment Proposal, voids all signatures, and
+  files the note as a follow-up
 - **M5 (done)** — reports: pipeline matrix (stage × asset class, counts and $mm),
   per-role approval queue with a personal "waiting on you" list, workload by person
 - **Post-v1 (done)** — in-app document viewer (native PDF + image rendering, versioned,

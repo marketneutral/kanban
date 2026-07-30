@@ -2,8 +2,9 @@ import Link from "next/link";
 import type { GateStatus } from "@/lib/workflow";
 import { STAGE_LABELS, type Stage } from "@/lib/types";
 import { fmtMeeting } from "@/lib/meetings";
-import { moveStage, setDealStatus } from "@/app/actions/deals";
+import { markFunded, revertFunded, moveStage, setDealStatus } from "@/app/actions/deals";
 import { recordPresentation } from "@/app/actions/workflow";
+import { fmtDate } from "@/lib/format";
 
 const PRESENTED_STAGES = ["ONE_PAGER", "FIVE_PAGER", "PROPOSAL"];
 
@@ -13,6 +14,9 @@ export default function GatePanel({
   status,
   gate,
   manager,
+  canFund,
+  admin,
+  fundedAt,
   prevStage,
   needsPresentation,
   scheduledFor,
@@ -22,6 +26,10 @@ export default function GatePanel({
   status: string;
   gate: GateStatus;
   manager: boolean;
+  /** user may mark the approved deal funded (Ops or admin) */
+  canFund: boolean;
+  admin: boolean;
+  fundedAt: Date | null;
   prevStage: Stage | null;
   needsPresentation: boolean;
   scheduledFor: Date | null;
@@ -48,9 +56,47 @@ export default function GatePanel({
       </div>
 
       {terminal ? (
-        <p className="mt-3 text-sm text-stone-500">
-          This deal is fully approved. 🎉
-        </p>
+        status === "FUNDED" ? (
+          <div className="mt-3">
+            <p className="text-sm text-stone-600">
+              💰 Closed and funded {fundedAt ? `on ${fmtDate(fundedAt)}` : ""}. This deal is
+              complete and hidden from the default board view.
+            </p>
+            {admin && (
+              <form action={revertFunded} className="mt-3">
+                <input type="hidden" name="dealId" value={dealId} />
+                <button className="w-full rounded-md border border-stone-200 bg-white px-3 py-1.5 text-[12px] text-stone-500 shadow-sm hover:bg-stone-50">
+                  Undo funding mark (admin)
+                </button>
+              </form>
+            )}
+          </div>
+        ) : (
+          <div className="mt-3">
+            <p className="text-sm text-stone-500">This deal is fully approved. 🎉</p>
+            {canFund && status === "APPROVED" && (
+              <form
+                action={markFunded}
+                className="mt-3 flex flex-col gap-2 rounded-lg bg-emerald-50/60 p-3"
+              >
+                <input type="hidden" name="dealId" value={dealId} />
+                <label className="text-[12px] font-medium text-emerald-800">
+                  Allocation wired on
+                </label>
+                <input
+                  type="date"
+                  name="fundedAt"
+                  required
+                  defaultValue={new Date().toISOString().slice(0, 10)}
+                  className="rounded-md border border-emerald-200 bg-white px-2.5 py-1.5 text-[13px] shadow-sm focus:border-emerald-400 focus:outline-none"
+                />
+                <button className="rounded-md bg-emerald-600 px-3 py-1.5 text-[13px] font-medium text-white shadow-sm hover:bg-emerald-700">
+                  Mark closed &amp; funded
+                </button>
+              </form>
+            )}
+          </div>
+        )
       ) : (
         <ul className="mt-3 space-y-2">
           {gate.requirements.map((r) => (
@@ -153,7 +199,7 @@ export default function GatePanel({
         </div>
       )}
 
-      {manager && !terminal && (
+      {manager && status !== "FUNDED" && (
         <StatusControls dealId={dealId} status={status} />
       )}
     </section>
@@ -171,22 +217,22 @@ function StatusControls({ dealId, status }: { dealId: string; status: string }) 
         {status === "ACTIVE" && (
           <StatusForm dealId={dealId} status="ON_HOLD" label="Put on hold" />
         )}
-        {status !== "PASSED" && (
+        {status !== "PENCILS_DOWN" && (
           <form action={setDealStatus} className="flex flex-col gap-2">
             <input type="hidden" name="dealId" value={dealId} />
-            <input type="hidden" name="status" value="PASSED" />
+            <input type="hidden" name="status" value="PENCILS_DOWN" />
             <input
               name="reason"
               required
-              placeholder="Reason for passing (required)"
+              placeholder="Reason (required) — closes out non-funded"
               className="w-full rounded-md border border-stone-200 bg-white px-3 py-2 text-[13px] shadow-sm placeholder:text-stone-400 focus:border-accent-400 focus:outline-none"
             />
             <button className="w-full rounded-md border border-red-200 bg-white px-3 py-2 text-sm text-red-600 shadow-sm hover:bg-red-50">
-              Pass on this deal
+              ✏️ Pencils down
             </button>
           </form>
         )}
-        {status === "PASSED" && (
+        {status === "PENCILS_DOWN" && (
           <StatusForm dealId={dealId} status="ACTIVE" label="Reopen deal" />
         )}
       </div>

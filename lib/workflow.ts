@@ -154,7 +154,7 @@ export function evaluateGate(deal: GateDeal): GateStatus {
     case "APPROVALS":
       // Exit happens only through the approval chain (M4), never a manual move.
       requirements = [
-        { key: "chain", label: "Approval chain complete (MD + Legal → COO → CEO)", met: false },
+        { key: "chain", label: "Approval chain complete (MD + Legal → CFO → CEO)", met: false },
       ];
       break;
 
@@ -205,10 +205,10 @@ export type ApprovalRow = {
 };
 
 export type ChainStep = {
-  step: "MD" | "LEGAL" | "COO" | "CEO";
+  step: "MD" | "LEGAL" | "CFO" | "CEO";
   row: ApprovalRow | undefined;
   /** the role whose signature this step requires */
-  requiredRole: "MD_PUBLIC" | "MD_PRIVATE" | "LEGAL" | "COO" | "CEO";
+  requiredRole: "MD_PUBLIC" | "MD_PRIVATE" | "LEGAL" | "CFO" | "CEO";
   /** step can be acted on right now */
   available: boolean;
   /** why it can't be acted on yet (when pending and not available) */
@@ -222,7 +222,7 @@ export function mdRoleFor(marketType: string): "MD_PUBLIC" | "MD_PRIVATE" {
 
 /**
  * MD and Legal sign in parallel (Legal additionally gated on the legal doc
- * track), then COO, then CEO — the sequential routing decided in PLAN.md.
+ * track), then CFO, then CEO — the sequential routing decided in PLAN.md.
  * The MD step routes to the MD matching the deal's market type.
  */
 export function evaluateChain(
@@ -233,7 +233,7 @@ export function evaluateChain(
   const get = (s: string) => approvals.find((a) => a.step === s);
   const md = get("MD");
   const legal = get("LEGAL");
-  const coo = get("COO");
+  const cfo = get("CFO");
   const ceo = get("CEO");
   const actionable = deal.stage === "APPROVALS" && deal.status === "ACTIVE";
   const legalDocs = evaluateLegal(deal);
@@ -257,16 +257,16 @@ export function evaluateChain(
           : null,
     },
     {
-      step: "COO",
-      row: coo,
-      requiredRole: "COO",
+      step: "CFO",
+      row: cfo,
+      requiredRole: "CFO",
       available:
         actionable &&
-        coo?.status === "PENDING" &&
+        cfo?.status === "PENDING" &&
         md?.status === "APPROVED" &&
         legal?.status === "APPROVED",
       blockedReason:
-        coo?.status === "PENDING" && !(md?.status === "APPROVED" && legal?.status === "APPROVED")
+        cfo?.status === "PENDING" && !(md?.status === "APPROVED" && legal?.status === "APPROVED")
           ? "Waiting on MD and Legal approvals"
           : null,
     },
@@ -274,16 +274,16 @@ export function evaluateChain(
       step: "CEO",
       row: ceo,
       requiredRole: "CEO",
-      available: actionable && ceo?.status === "PENDING" && coo?.status === "APPROVED",
+      available: actionable && ceo?.status === "PENDING" && cfo?.status === "APPROVED",
       blockedReason:
-        ceo?.status === "PENDING" && coo?.status !== "APPROVED" ? "Waiting on COO approval" : null,
+        ceo?.status === "PENDING" && cfo?.status !== "APPROVED" ? "Waiting on CFO approval" : null,
     },
   ];
 }
 
 /** Create (or reset to pending) the four approval rows when a deal enters Approvals. */
 export async function resetApprovals(dealId: string) {
-  for (const step of ["MD", "LEGAL", "COO", "CEO"]) {
+  for (const step of ["MD", "LEGAL", "CFO", "CEO"]) {
     await db.approval.upsert({
       where: { dealId_step: { dealId, step } },
       update: { status: "PENDING", decidedById: null, decidedAt: null, note: null },

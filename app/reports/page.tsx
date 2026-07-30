@@ -51,7 +51,7 @@ export default async function ReportsPage() {
 
   // ---- approval queues: one per signing role -------------------------------
   // The MD step routes by market type, so there are five queues, not four.
-  const QUEUE_ROLES = ["MD_PUBLIC", "MD_PRIVATE", "LEGAL", "COO", "CEO"] as const;
+  const QUEUE_ROLES = ["MD_PUBLIC", "MD_PRIVATE", "LEGAL", "CFO", "CEO"] as const;
   const inChain = deals.filter((d) => d.stage === "APPROVALS" && d.status === "ACTIVE");
   const actionable = inChain.flatMap((d) =>
     evaluateChain(d, d.approvals, mdRoleFor(d.assetClass.marketType))
@@ -83,7 +83,7 @@ export default async function ReportsPage() {
     <div className="mx-auto max-w-6xl px-5 py-8">
       <h1 className="text-lg font-semibold tracking-tight text-stone-900">Reports</h1>
       <p className="text-[13px] text-stone-500">
-        Live views over the in-progress pipeline (passed deals excluded).
+        Live views over the in-progress pipeline (funded and pencils-down deals excluded).
       </p>
 
       {/* Waiting on you */}

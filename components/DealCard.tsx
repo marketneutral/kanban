@@ -20,13 +20,14 @@ export type DealCardData = {
 export default function DealCard({ deal }: { deal: DealCardData }) {
   const days = daysSince(deal.stageEnteredAt);
   const onHold = deal.status === "ON_HOLD";
-  const passed = deal.status === "PASSED";
+  const closed = deal.status === "PENCILS_DOWN";
+  const funded = deal.status === "FUNDED";
 
   return (
     <Link
       href={`/deals/${deal.id}`}
       className={`block rounded-lg border bg-white p-3 shadow-sm transition hover:-translate-y-px hover:shadow ${
-        passed
+        closed
           ? "border-stone-200 opacity-50"
           : onHold
             ? "border-dashed border-stone-300 opacity-75"
@@ -65,9 +66,14 @@ export default function DealCard({ deal }: { deal: DealCardData }) {
             On hold
           </span>
         )}
-        {passed && (
+        {closed && (
           <span className="rounded bg-stone-100 px-1.5 py-0.5 text-[11px] font-medium text-stone-500">
-            Passed
+            Pencils down
+          </span>
+        )}
+        {funded && (
+          <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700">
+            Funded
           </span>
         )}
       </div>
@@ -80,7 +86,7 @@ export default function DealCard({ deal }: { deal: DealCardData }) {
               className={`h-2 w-2 rounded-full ${deal.gateReady ? "bg-emerald-400" : "bg-amber-300"}`}
             />
           )}
-          <span className={days > 30 && !passed ? "font-medium text-amber-600" : ""}>
+          <span className={days > 30 && !closed && !funded ? "font-medium text-amber-600" : ""}>
             {days}d in stage
           </span>
         </span>

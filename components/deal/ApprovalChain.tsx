@@ -25,7 +25,7 @@ export default function ApprovalChain({
         </span>
       </div>
       <p className="mt-1 text-[12px] text-stone-400">
-        MD and Legal sign in parallel, then COO, then CEO.
+        MD and Legal sign in parallel, then CFO, then CEO.
       </p>
 
       <ol className="mt-3 space-y-2.5">

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/session";
-import { STAGES, STAGE_LABELS, canManageDeals } from "@/lib/types";
+import { STAGES, STAGE_LABELS, canManageDeals, IN_PROGRESS_STATUSES } from "@/lib/types";
 import { evaluateGate, gateInclude } from "@/lib/workflow";
 import { fmtMm } from "@/lib/format";
 import FilterBar from "@/components/FilterBar";
@@ -15,18 +15,43 @@ export const dynamic = "force-dynamic";
 export default async function BoardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ assetClass?: string; lead?: string; show?: string; view?: string }>;
+  searchParams: Promise<{
+    assetClass?: string;
+    lead?: string;
+    show?: string;
+    view?: string;
+    q?: string;
+  }>;
 }) {
   const user = await requireUser();
-  const { assetClass, lead, show, view } = await searchParams;
+  const { assetClass, lead, show, view, q } = await searchParams;
   const isMap = view === "map";
+  const query = q?.trim();
+
+  // Default view is the working pipeline; funded and pencils-down deals are
+  // hidden until asked for. Search applies over whatever the filters allow.
+  const statusFilter =
+    show === "all"
+      ? {}
+      : show === "funded"
+        ? { status: "FUNDED" }
+        : { status: { in: [...IN_PROGRESS_STATUSES] } };
 
   const [deals, assetClasses, leads] = await Promise.all([
     db.deal.findMany({
       where: {
         ...(assetClass ? { assetClassId: assetClass } : {}),
         ...(lead ? { leadId: lead } : {}),
-        ...(show === "all" ? {} : { status: { in: ["ACTIVE", "ON_HOLD", "APPROVED"] } }),
+        ...statusFilter,
+        ...(query
+          ? {
+              OR: [
+                { managerName: { contains: query } },
+                { fundName: { contains: query } },
+                { strategy: { contains: query } },
+              ],
+            }
+          : {}),
       },
       include: {
         assetClass: true,
@@ -78,6 +103,7 @@ export default async function BoardPage({
   if (assetClass) baseParams.set("assetClass", assetClass);
   if (lead) baseParams.set("lead", lead);
   if (show) baseParams.set("show", show);
+  if (query) baseParams.set("q", query);
   const viewHref = (v: string) => {
     const p = new URLSearchParams(baseParams);
     if (v === "map") p.set("view", "map");

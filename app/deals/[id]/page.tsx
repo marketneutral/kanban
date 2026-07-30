@@ -34,7 +34,10 @@ const EVENT_LABELS: Record<string, string> = {
   STAGE_SENT_BACK: "sent the deal back",
   STATUS_ON_HOLD: "put the deal on hold",
   STATUS_ACTIVE: "reactivated the deal",
-  STATUS_PASSED: "passed on the deal",
+  STATUS_APPROVED: "reactivated the deal",
+  STATUS_PENCILS_DOWN: "went pencils down on the deal",
+  DEAL_FUNDED: "marked the deal closed & funded",
+  DEAL_FUNDING_REVERTED: "reverted the funding mark",
   FOLLOWUP_ADDED: "added a follow-up",
   FOLLOWUP_RESOLVED: "resolved a follow-up",
   FOLLOWUP_WAIVED: "waived a follow-up",
@@ -201,6 +204,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
                 label="In stage"
                 value={`${daysSince(deal.stageEnteredAt)}d (since ${fmtDate(deal.stageEnteredAt)})`}
               />
+              {deal.fundedAt && <Fact label="Funded" value={fmtDate(deal.fundedAt)} />}
             </dl>
 
             <h3 className="mt-5 text-[13px] font-semibold uppercase tracking-wide text-stone-400">
@@ -248,9 +252,10 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
               </>
             )}
 
-            {deal.passedReason && (
+            {deal.pencilsDownReason && (
               <div className="mt-5 rounded-lg bg-stone-100 p-3 text-sm text-stone-600">
-                <span className="font-medium text-stone-800">Passed:</span> {deal.passedReason}
+                <span className="font-medium text-stone-800">✏️ Pencils down:</span>{" "}
+                {deal.pencilsDownReason}
               </div>
             )}
           </section>
@@ -318,6 +323,9 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
             status={status}
             gate={gate}
             manager={manager}
+            canFund={canOps}
+            admin={admin}
+            fundedAt={deal.fundedAt}
             prevStage={idx > 0 ? (STAGES[idx - 1] as Stage) : null}
             needsPresentation={needsPresentation}
             scheduledFor={deal.scheduledFor}
@@ -392,8 +400,9 @@ function StatusBadge({ status }: { status: DealStatus }) {
   const styles: Record<DealStatus, string> = {
     ACTIVE: "bg-accent-50 text-accent-800",
     ON_HOLD: "bg-amber-50 text-amber-700",
-    PASSED: "bg-stone-100 text-stone-500",
+    PENCILS_DOWN: "bg-stone-100 text-stone-500",
     APPROVED: "bg-emerald-50 text-emerald-700",
+    FUNDED: "bg-emerald-600 text-white",
   };
   return (
     <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${styles[status]}`}>

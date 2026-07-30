@@ -4,7 +4,7 @@ export const ROLES = [
   "LEGAL",
   "MD_PUBLIC",
   "MD_PRIVATE",
-  "COO",
+  "CFO",
   "CEO",
   "ADMIN",
 ] as const;
@@ -16,7 +16,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   LEGAL: "Legal",
   MD_PUBLIC: "MD — Publics",
   MD_PRIVATE: "MD — Privates",
-  COO: "COO",
+  CFO: "CFO",
   CEO: "CEO",
   ADMIN: "Admin",
 };
@@ -45,15 +45,25 @@ export const STAGE_LABELS: Record<Stage, string> = {
   APPROVED: "Approved",
 };
 
-export const DEAL_STATUSES = ["ACTIVE", "ON_HOLD", "PASSED", "APPROVED"] as const;
+export const DEAL_STATUSES = [
+  "ACTIVE",
+  "ON_HOLD",
+  "PENCILS_DOWN",
+  "APPROVED",
+  "FUNDED",
+] as const;
 export type DealStatus = (typeof DEAL_STATUSES)[number];
 
 export const DEAL_STATUS_LABELS: Record<DealStatus, string> = {
   ACTIVE: "Active",
   ON_HOLD: "On Hold",
-  PASSED: "Passed",
+  PENCILS_DOWN: "Pencils Down",
   APPROVED: "Approved",
+  FUNDED: "Funded",
 };
+
+/** Statuses shown by default on the board and in reports — the working pipeline. */
+export const IN_PROGRESS_STATUSES = ["ACTIVE", "ON_HOLD", "APPROVED"] as const;
 
 export const DOC_KINDS = [
   "PITCH_DECK",
@@ -80,13 +90,13 @@ export const DOC_KIND_LABELS: Record<DocKind, string> = {
   OTHER: "Other",
 };
 
-export const APPROVAL_STEPS = ["MD", "LEGAL", "COO", "CEO"] as const;
+export const APPROVAL_STEPS = ["MD", "LEGAL", "CFO", "CEO"] as const;
 export type ApprovalStep = (typeof APPROVAL_STEPS)[number];
 
 export const APPROVAL_STEP_LABELS: Record<ApprovalStep, string> = {
   MD: "MD — Investment",
   LEGAL: "Legal — Docs",
-  COO: "COO",
+  CFO: "CFO",
   CEO: "CEO",
 };
 

@@ -36,7 +36,7 @@ model UserRole {
   id     String @id @default(cuid())
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId String
-  role   String // DEAL_TEAM | OPS | LEGAL | MD_PUBLIC | MD_PRIVATE | COO | CEO | ADMIN
+  role   String // DEAL_TEAM | OPS | LEGAL | MD_PUBLIC | MD_PRIVATE | CFO | CEO | ADMIN
 
   @@unique([userId, role])
 }
@@ -62,8 +62,11 @@ model Deal {
   notes        String?
 
   stage          String   @default("PIPELINE") // PIPELINE | ONE_PAGER | FIVE_PAGER | ODD_LEGAL | PROPOSAL | APPROVALS | APPROVED
-  status         String   @default("ACTIVE") // ACTIVE | ON_HOLD | PASSED | APPROVED
-  passedReason   String?
+  status         String   @default("ACTIVE") // ACTIVE | ON_HOLD | PENCILS_DOWN | APPROVED | FUNDED
+  // set when the deal goes pencils down: closed out non-funded, at any stage
+  pencilsDownReason String?
+  // set when Ops marks the approved allocation wired; FUNDED deals are hidden by default
+  fundedAt       DateTime?
   stageEnteredAt DateTime @default(now())
 
   // upcoming IC meeting (Monday) this deal is slated to present at
@@ -160,7 +163,7 @@ model Approval {
   id          String    @id @default(cuid())
   deal        Deal      @relation(fields: [dealId], references: [id], onDelete: Cascade)
   dealId      String
-  step        String // MD | LEGAL | COO | CEO
+  step        String // MD | LEGAL | CFO | CEO
   status      String    @default("PENDING") // PENDING | APPROVED | REJECTED
   decidedBy   User?     @relation(fields: [decidedById], references: [id])
   decidedById String?

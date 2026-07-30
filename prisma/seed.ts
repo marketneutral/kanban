@@ -93,7 +93,7 @@ async function main() {
     { name: "Sofia Lindgren", email: "sofia@example.com", roles: ["LEGAL"] },
     { name: "Morgan Chen", email: "morgan@example.com", roles: ["MD_PUBLIC"] },
     { name: "Grace Kimball", email: "grace@example.com", roles: ["MD_PRIVATE"] },
-    { name: "Taylor Brooks", email: "taylor@example.com", roles: ["COO"] },
+    { name: "Taylor Brooks", email: "taylor@example.com", roles: ["CFO"] },
     { name: "Casey Whitfield", email: "casey@example.com", roles: ["CEO"] },
   ];
   const userIds: Record<string, string> = {};
@@ -333,6 +333,19 @@ Flag anything else a careful institutional LP would raise, including unusual or 
         stage: "APPROVED",
         daysAgo: 3,
       },
+      {
+        // demonstrates the closed & funded state (hidden from the default board)
+        managerName: "Westgate Partners",
+        fundName: "Westgate Structured Credit Fund",
+        assetClass: "Credit",
+        strategy: "Structured credit relative value",
+        targetSizeMm: 80,
+        lead: "Marcus Webb",
+        team: ["Ines Delgado"],
+        source: "Existing relationship",
+        stage: "APPROVED",
+        daysAgo: 45,
+      },
     ];
 
     const STAGE_ORDER = [
@@ -489,11 +502,11 @@ Flag anything else a careful institutional LP would raise, including unusual or 
         const signers: Record<string, string> = {
           MD: isPrivate ? userIds["Grace Kimball"]! : userIds["Morgan Chen"]!,
           LEGAL: userIds["Priya Shah"]!,
-          COO: userIds["Taylor Brooks"]!,
+          CFO: userIds["Taylor Brooks"]!,
           CEO: userIds["Casey Whitfield"]!,
         };
-        for (const step of ["MD", "LEGAL", "COO", "CEO"]) {
-          // Ironbark mid-chain: MD + Legal signed, COO/CEO pending
+        for (const step of ["MD", "LEGAL", "CFO", "CEO"]) {
+          // Ironbark mid-chain: MD + Legal signed, CFO/CEO pending
           const signed = finalized || step === "MD" || step === "LEGAL";
           await db.approval.create({
             data: {
@@ -508,6 +521,18 @@ Flag anything else a careful institutional LP would raise, including unusual or 
         if (finalized) {
           await db.deal.update({ where: { id: deal.id }, data: { status: "APPROVED" } });
         }
+      }
+
+      // Westgate is the closed-and-funded example: wired a month ago.
+      if (d.managerName === "Westgate Partners") {
+        await db.deal.update({
+          where: { id: deal.id },
+          data: {
+            status: "FUNDED",
+            fundedAt: new Date(Date.now() - 30 * 86_400_000),
+            events: { create: { actorId: userIds["Alex Kim"]!, action: "DEAL_FUNDED" } },
+          },
+        });
       }
 
       // A live open follow-up on the in-progress pager deals for realism.
