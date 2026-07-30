@@ -161,7 +161,7 @@ export default async function BoardPage({
           assetClasses={assetClasses.map((a) => a.name).sort((a, b) => a.localeCompare(b))}
         />
       ) : (
-        <div className="mt-5 grid auto-cols-[minmax(230px,1fr)] grid-flow-col gap-3 overflow-x-auto pb-4">
+        <div className="mt-5 grid auto-cols-[minmax(205px,1fr)] grid-flow-col gap-3 overflow-x-auto pb-4 [scrollbar-width:thin] [scrollbar-color:theme(colors.stone.300)_transparent]">
           {STAGES.map((stage) => {
             const cards = byStage.get(stage) ?? [];
             const columnMm = cards.reduce((s, d) => s + (d.targetSizeMm ?? 0), 0);
